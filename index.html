@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>幣安 USDT-M 合約 5分鐘漲跌幅排行榜</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        binanceDark: '#0b0e11',
+                        binanceCard: '#181a20',
+                        binanceBorder: '#2b313a',
+                        binanceGreen: '#0ecb81',
+                        binanceRed: '#f6465d',
+                        neonYellow: '#f3ba2f',
+                        neonCyan: '#00f2fe'
+                    },
+                    boxShadow: {
+                        neonGreen: '0 0 12px rgba(14, 203, 129, 0.6)',
+                        neonRed: '0 0 12px rgba(246, 70, 93, 0.6)',
+                        neonBadge: '0 0 10px rgba(243, 186, 47, 0.8)'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #0b0e11;
+            color: #eaecef;
+        }
+        
+        /* 亮色新上榜動態特效 */
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 0 0 12px #f3ba2f, 0 0 20px #f3ba2f;
+                transform: scale(1);
+            }
+            50% {
+                box-shadow: 0 0 20px #00f2fe, 0 0 30px #00f2fe;
+                transform: scale(1.05);
+            }
+        }
+        .new-badge {
+            animation: pulse-glow 2s infinite ease-in-out;
+            background: linear-gradient(135deg, #f3ba2f 0%, #00f2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+            text-shadow: 0 0 8px rgba(243, 186, 47, 0.5);
+        }
+
+        /* 自訂滾動條 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #181a20;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2b313a;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #474d57;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-3 md:p-6">
+
+    <!-- 頂部頁頭 / 狀態控制 -->
+    <div class="max-w-7xl mx-auto w-full">
+        <header class="flex flex-col md:flex-row items-center justify-between gap-4 pb-6 border-b border-binanceBorder">
+            <div class="flex items-center space-x-3">
+                <div class="bg-amber-400 p-2.5 rounded-xl text-black font-bold text-xl shadow-lg">
+                    <i class="fa-solid me-1 fa-chart-line"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-bold tracking-wide flex items-center gap-2">
+                        幣安合約 5分鐘漲跌幅榜
+                        <span class="text-xs px-2 py-0.5 rounded bg-binanceBorder text-gray-300 font-normal">USDT-M</span>
+                    </h1>
+                    <p class="text-xs text-gray-400 mt-1">追蹤近 2 小時內 5分鐘 K線飆升/急跌標的 · 新上榜高亮維持 7 分鐘</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <div id="connectionStatus" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-950/60 text-emerald-400 border border-emerald-800/50">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                    <span>數據連線中...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- 篩選工具列 -->
+        <section class="my-6 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-binanceCard p-4 rounded-xl border border-binanceBorder">
+            <!-- 12小時成交額篩選器 -->
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-xs text-gray-400 font-medium mr-1"><i class="fa-solid fa-filter me-1"></i>12小時成交額門檻：</span>
+                <div class="inline-flex p-1 bg-binanceDark rounded-lg border border-binanceBorder" id="volumeFilterContainer">
+                    <button data-vol="10000000" onclick="setVolumeFilter(10000000)" class="vol-btn px-3 py-1.5 text-xs rounded-md font-medium transition-all bg-amber-400 text-black shadow">≥ $10M</button>
+                    <button data-vol="30000000" onclick="setVolumeFilter(30000000)" class="vol-btn px-3 py-1.5 text-xs rounded-md font-medium text-gray-400 hover:text-white transition-all">≥ $30M</button>
+                    <button data-vol="50000000" onclick="setVolumeFilter(50000000)" class="vol-btn px-3 py-1.5 text-xs rounded-md font-medium text-gray-400 hover:text-white transition-all">≥ $50M</button>
+                    <button data-vol="100000000" onclick="setVolumeFilter(100000000)" class="vol-btn px-3 py-1.5 text-xs rounded-md font-medium text-gray-400 hover:text-white transition-all">≥ $100M</button>
+                </div>
+            </div>
+
+            <!-- 搜尋框 & 更新時間 -->
+            <div class="flex items-center gap-4">
+                <div class="relative flex-1 md:w-64">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                    <input type="text" id="searchInput" oninput="renderTables()" placeholder="搜尋幣種 (如 BTC, ETH)..." 
+                           class="w-full pl-9 pr-3 py-1.5 bg-binanceDark border border-binanceBorder rounded-lg text-xs text-white focus:outline-none focus:border-amber-400 transition-colors">
+                </div>
+                <div class="text-right text-xs text-gray-400">
+                    <div>最後更新</div>
+                    <div id="lastUpdateTime" class="font-mono text-gray-200">--:--:--</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 排行榜主要數據區域 (分左右兩欄) -->
+        <main class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            <!-- 5分鐘 漲幅榜 -->
+            <div class="bg-binanceCard border border-binanceBorder rounded-xl overflow-hidden shadow-xl">
+                <div class="px-5 py-4 border-b border-binanceBorder flex items-center justify-between bg-emerald-950/20">
+                    <div class="flex items-center gap-2">
+                        <div class="w-2.5 h-2.5 rounded-full bg-binanceGreen shadow-neonGreen"></div>
+                        <h2 class="font-bold text-base text-emerald-400 tracking-wide">2小時內 5分鐘漲幅榜 TOP 10</h2>
+                    </div>
+                    <span class="text-xs text-emerald-500/80 font-mono" id="gainerCount">載入中...</span>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="text-[11px] text-gray-400 border-b border-binanceBorder/60 bg-binanceDark/40 uppercase">
+                                <th class="py-3 px-4 font-semibold"># 排名</th>
+                                <th class="py-3 px-4 font-semibold">幣種</th>
+                                <th class="py-3 px-4 font-semibold text-right">當前價格</th>
+                                <th class="py-3 px-4 font-semibold text-right">5m 漲跌幅</th>
+                                <th class="py-3 px-4 font-semibold text-right">12h 成交額</th>
+                                <th class="py-3 px-4 font-semibold text-center">交易</th>
+                            </tr>
+                        </thead>
+                        <tbody id="gainersTbody" class="divide-y divide-binanceBorder/40 text-xs">
+                            <tr>
+                                <td colspan="6" class="py-12 text-center text-gray-500">
+                                    <i class="fa-solid fa-spinner fa-spin text-xl mb-2"></i>
+                                    <div>正在計算近2小時5分鐘數據...</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 5分鐘 跌幅榜 -->
+            <div class="bg-binanceCard border border-binanceBorder rounded-xl overflow-hidden shadow-xl">
+                <div class="px-5 py-4 border-b border-binanceBorder flex items-center justify-between bg-rose-950/20">
+                    <div class="flex items-center gap-2">
+                        <div class="w-2.5 h-2.5 rounded-full bg-binanceRed shadow-neonRed"></div>
+                        <h2 class="font-bold text-base text-rose-400 tracking-wide">2小時內 5分鐘跌幅榜 TOP 10</h2>
+                    </div>
+                    <span class="text-xs text-rose-500/80 font-mono" id="loserCount">載入中...</span>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="text-[11px] text-gray-400 border-b border-binanceBorder/60 bg-binanceDark/40 uppercase">
+                                <th class="py-3 px-4 font-semibold"># 排名</th>
+                                <th class="py-3 px-4 font-semibold">幣種</th>
+                                <th class="py-3 px-4 font-semibold text-right">當前價格</th>
+                                <th class="py-3 px-4 font-semibold text-right">5m 漲跌幅</th>
+                                <th class="py-3 px-4 font-semibold text-right">12h 成交額</th>
+                                <th class="py-3 px-4 font-semibold text-center">交易</th>
+                            </tr>
+                        </thead>
+                        <tbody id="losersTbody" class="divide-y divide-binanceBorder/40 text-xs">
+                            <tr>
+                                <td colspan="6" class="py-12 text-center text-gray-500">
+                                    <i class="fa-solid fa-spinner fa-spin text-xl mb-2"></i>
+                                    <div>正在計算近2小時5分鐘數據...</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- 頁腳 -->
+    <footer class="max-w-7xl mx-auto w-full mt-8 pt-4 border-t border-binanceBorder/50 flex flex-col sm:flex-row justify-between items-center gap-2 text-xs text-gray-500">
+        <div>數據來源：幣安 USDT-M永續合約 REST / WebSocket API</div>
+        <div>提示：「新上榜」狀態持續 7 分鐘後自動消退</div>
+    </footer>
+
+    <!-- JavaScript 邏輯控制 -->
+    <script>
+        // 全局狀態
+        let minVolumeThreshold = 10000000; // 預設 12h 成交額 >= $10M
+        let marketData = {}; // key: symbol -> { price, change5m, vol12h }
+        let entrantHistory = {}; // key: symbol -> firstEnteredTimestamp
+        let topGainersList = [];
+        let topLosersList = [];
+        let wsConnection = null;
+
+        const NEW_ENTRANT_DURATION = 7 * 60 * 1000; // 7 分鐘毫秒數
+
+        // 頁面載入初始化
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchInitialData();
+            // 每 15 秒重新整理一次全面 K線計算，補強完整度
+            setInterval(fetchInitialData, 15000);
+            // 每秒觸發 UI 渲染 (負責倒數計時與消退新上榜標籤)
+            setInterval(renderTables, 1000);
+        });
+
+        // 12小時成交額切換
+        function setVolumeFilter(vol) {
+            minVolumeThreshold = vol;
+            document.querySelectorAll('.vol-btn').forEach(btn => {
+                if (parseInt(btn.getAttribute('data-vol')) === vol) {
+                    btn.className = 'vol-btn px-3 py-1.5 text-xs rounded-md font-medium transition-all bg-amber-400 text-black shadow';
+                } else {
+                    btn.className = 'vol-btn px-3 py-1.5 text-xs rounded-md font-medium text-gray-400 hover:text-white transition-all';
+                }
+            });
+            processRankings();
+            renderTables();
+        }
+
+        // 抓取幣安 USDT-M 24h ticker 與計算 12h 成交量 & 5分鐘漲跌幅
+        async function fetchInitialData() {
+            try {
+                // 1. 抓取 24hr Ticker 取得成交額與價格
+                const tickerRes = await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr');
+                const tickers = await tickerRes.json();
+
+                // 篩選 USDT 合約
+                const usdtPairs = tickers.filter(t => t.symbol.endsWith('USDT'));
+
+                // 2. 批次獲取 5m K線，預篩選減少不必要的 API 請求
+                const candidatePairs = usdtPairs.filter(t => parseFloat(t.quoteVolume) / 2 >= minVolumeThreshold * 0.7);
+
+                // 使用 Promise.all 併行抓取 5m K線 (最後 2 根用於計算最新 5m 漲跌幅)
+                const fetchKlinesProms = candidatePairs.map(async (ticker) => {
+                    const symbol = ticker.symbol;
+                    const price = parseFloat(ticker.lastPrice);
+                    // 24小時 QuoteVolume 除以 2 近似為 12小時成交額
+                    const vol12h = parseFloat(ticker.quoteVolume) / 2;
+
+                    try {
+                        const klineRes = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=5m&limit=2`);
+                        const klines = await klineRes.json();
+
+                        if (klines && klines.length >= 2) {
+                            const prevClose = parseFloat(klines[klines.length - 2][4]);
+                            const currentPrice = parseFloat(klines[klines.length - 1][4]);
+                            const change5m = ((currentPrice - prevClose) / prevClose) * 100;
+
+                            marketData[symbol] = {
+                                symbol: symbol,
+                                price: currentPrice,
+                                change5m: change5m,
+                                vol12h: vol12h
+                            };
+                        }
+                    } catch (e) {
+                        console.error(`Kline fetch error for ${symbol}`, e);
+                    }
+                });
+
+                await Promise.all(fetchKlinesProms);
+
+                document.getElementById('lastUpdateTime').innerText = new Date().toLocaleTimeString();
+                updateConnectionStatus(true);
+                
+                processRankings();
+                renderTables();
+
+                // 啟動 WebSocket 實時數據串流
+                if (!wsConnection) {
+                    initWebSocket();
+                }
+
+            } catch (error) {
+                console.error("Fetch Binance Data Error:", error);
+                updateConnectionStatus(false);
+            }
+        }
+
+        // 初始化 WebSocket 全量 MiniTicker 串流
+        function initWebSocket() {
+            try {
+                wsConnection = new WebSocket('wss://fstream.binance.com/ws/!miniTicker@arr');
+
+                wsConnection.onopen = () => {
+                    updateConnectionStatus(true);
+                };
+
+                wsConnection.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    let updated = false;
+
+                    data.forEach(item => {
+                        const symbol = item.s;
+                        if (symbol.endsWith('USDT') && marketData[symbol]) {
+                            const curPrice = parseFloat(item.c);
+                            marketData[symbol].price = curPrice;
+                            updated = true;
+                        }
+                    });
+
+                    if (updated) {
+                        processRankings();
+                        renderTables();
+                    }
+                };
+
+                wsConnection.onerror = () => updateConnectionStatus(false);
+                wsConnection.onclose = () => {
+                    updateConnectionStatus(false);
+                    setTimeout(initWebSocket, 5000);
+                };
+            } catch (e) {
+                console.error("WS Error:", e);
+            }
+        }
+
+        // 處理與計算排行榜 + 判斷新上榜邏輯
+        function processRankings() {
+            const now = Date.now();
+            const searchKeyword = document.getElementById('searchInput').value.trim().toUpperCase();
+
+            // 轉換為陣列並應用 12小時成交額過濾器
+            let validSymbols = Object.values(marketData).filter(item => {
+                const passVol = item.vol12h >= minVolumeThreshold;
+                const passSearch = searchKeyword ? item.symbol.includes(searchKeyword) : true;
+                return passVol && passSearch;
+            });
+
+            // 1. 計算漲幅榜 TOP 10
+            let sortedGainers = [...validSymbols].sort((a, b) => b.change5m - a.change5m).slice(0, 10);
+            
+            // 2. 計算跌幅榜 TOP 10
+            let sortedLosers = [...validSymbols].sort((a, b) => a.change5m - b.change5m).slice(0, 10);
+
+            // 檢查新上榜邏輯 (包含漲幅與跌幅)
+            const currentTopSymbols = new Set([
+                ...sortedGainers.map(s => s.symbol),
+                ...sortedLosers.map(s => s.symbol)
+            ]);
+
+            currentTopSymbols.forEach(symbol => {
+                if (!entrantHistory[symbol]) {
+                    // 首次進入 TOP 10，記錄時間戳
+                    entrantHistory[symbol] = now;
+                }
+            });
+
+            topGainersList = sortedGainers;
+            topLosersList = sortedLosers;
+        }
+
+        // 渲染表格內容
+        function renderTables() {
+            const now = Date.now();
+
+            // 渲染漲幅榜
+            const gainersTbody = document.getElementById('gainersTbody');
+            document.getElementById('gainerCount').innerText = `符合條件: ${topGainersList.length} 幣種`;
+
+            if (topGainersList.length === 0) {
+                gainersTbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-500">無符合成交額過濾條件之幣種</td></tr>`;
+            } else {
+                gainersTbody.innerHTML = topGainersList.map((item, index) => {
+                    const isNew = entrantHistory[item.symbol] && (now - entrantHistory[item.symbol] < NEW_ENTRANT_DURATION);
+                    const remainingTimeSec = isNew ? Math.ceil((NEW_ENTRANT_DURATION - (now - entrantHistory[item.symbol])) / 1000) : 0;
+                    
+                    return `
+                        <tr class="hover:bg-binanceDark/60 transition-colors">
+                            <td class="py-3 px-4 font-medium text-gray-400">
+                                <span class="inline-block w-5 text-center ${index < 3 ? 'text-amber-400 font-bold' : ''}">${index + 1}</span>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-white tracking-wide">${item.symbol.replace('USDT', '')}</span>
+                                    <span class="text-[10px] text-gray-400">USDT</span>
+                                    ${isNew ? `
+                                        <span class="new-badge text-[11px] px-1.5 py-0.5 rounded border border-amber-400/40 flex items-center gap-1" title="新上榜倒數: ${remainingTimeSec}秒">
+                                            <i class="fa-solid fa-bolt text-[10px] text-amber-300"></i>新上榜
+                                        </span>
+                                    ` : ''}
+                                </div>
+                            </td>
+                            <td class="py-3 px-4 text-right font-mono text-gray-200">
+                                $${formatPrice(item.price)}
+                            </td>
+                            <td class="py-3 px-4 text-right font-mono font-bold text-binanceGreen">
+                                +${item.change5m.toFixed(2)}%
+                            </td>
+                            <td class="py-3 px-4 text-right font-mono text-gray-400">
+                                $${formatVolume(item.vol12h)}
+                            </td>
+                            <td class="py-3 px-4 text-center">
+                                <a href="https://www.binance.com/zh-TC/futures/${item.symbol}" target="_blank" rel="noopener noreferrer" 
+                                   class="inline-flex items-center justify-center p-1.5 px-2.5 rounded bg-binanceBorder hover:bg-emerald-600 hover:text-white text-emerald-400 text-xs font-medium transition-all">
+                                    <span>交易</span>
+                                    <i class="fa-solid fa-arrow-up-right-from-square text-[10px] ml-1"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            // 渲染跌幅榜
+            const losersTbody = document.getElementById('losersTbody');
+            document.getElementById('loserCount').innerText = `符合條件: ${topLosersList.length} 幣種`;
+
+            if (topLosersList.length === 0) {
+                losersTbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-500">無符合成交額過濾條件之幣種</td></tr>`;
+            } else {
+                losersTbody.innerHTML = topLosersList.map((item, index) => {
+                    const isNew = entrantHistory[item.symbol] && (now - entrantHistory[item.symbol] < NEW_ENTRANT_DURATION);
+                    const remainingTimeSec = isNew ? Math.ceil((NEW_ENTRANT_DURATION - (now - entrantHistory[item.symbol])) / 1000) : 0;
+
+                    return `
+                        <tr class="hover:bg-binanceDark/60 transition-colors">
+                            <td class="py-3 px-4 font-medium text-gray-400">
+                                <span class="inline-block w-5 text-center ${index < 3 ? 'text-rose-400 font-bold' : ''}">${index + 1}</span>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-white tracking-wide">${item.symbol.replace('USDT', '')}</span>
+                                    <span class="text-[10px] text-gray-400">USDT</span>
+                                    ${isNew ? `
+                                        <span class="new-badge text-[11px] px-1.5 py-0.5 rounded border border-amber-400/40 flex items-center gap-1" title="新上榜倒數: ${remainingTimeSec}秒">
+                                            <i class="fa-solid fa-bolt text-[10px] text-amber-300"></i>新上榜
+                                        </span>
+                                    ` : ''}
+                                </div>
+                            </td>
+                            <td class="py-3 px-4 text-right font-mono text-gray-200">
+                                $${formatPrice(item.price)}
+                            </td>
+                            <td class="py-3 px-4 text-right font-mono font-bold text-binanceRed">
+                                ${item.change5m.toFixed(2)}%
+                            </td>
+                            <td class="py-3 px-4 text-right font-mono text-gray-400">
+                                $${formatVolume(item.vol12h)}
+                            </td>
+                            <td class="py-3 px-4 text-center">
+                                <a href="https://www.binance.com/zh-TC/futures/${item.symbol}" target="_blank" rel="noopener noreferrer" 
+                                   class="inline-flex items-center justify-center p-1.5 px-2.5 rounded bg-binanceBorder hover:bg-rose-600 hover:text-white text-rose-400 text-xs font-medium transition-all">
+                                    <span>交易</span>
+                                    <i class="fa-solid fa-arrow-up-right-from-square text-[10px] ml-1"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        // 更新網路狀態 UI
+        function updateConnectionStatus(isConnected) {
+            const statusEl = document.getElementById('connectionStatus');
+            if (isConnected) {
+                statusEl.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-950/60 text-emerald-400 border border-emerald-800/50";
+                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span><span>即時連線中</span>`;
+            } else {
+                statusEl.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-rose-950/60 text-rose-400 border border-rose-800/50";
+                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span><span>連線中斷/重新連線</span>`;
+            }
+        }
+
+        // 格式化數字價格
+        function formatPrice(price) {
+            if (price >= 1000) return price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            if (price >= 1) return price.toFixed(4);
+            return price.toFixed(6);
+        }
+
+        // 格式化成交金額 (M/K)
+        function formatVolume(vol) {
+            if (vol >= 1000000000) return (vol / 1000000000).toFixed(2) + 'B';
+            if (vol >= 1000000) return (vol / 1000000).toFixed(2) + 'M';
+            if (vol >= 1000) return (vol / 1000).toFixed(1) + 'K';
+            return vol.toFixed(0);
+        }
+    </script>
+</body>
+</html>
