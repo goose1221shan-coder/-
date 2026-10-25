@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Binance 合約 5分鐘動態漲跌幅榜</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        cryptoDark: '#0b0e11',
+                        cryptoCard: '#181a20',
+                        cryptoBorder: '#2b313a',
+                        cryptoGreen: '#0ecb81',
+                        cryptoRed: '#f6465d',
+                        neonYellow: '#ffe600',
+                        neonCyan: '#00ffcc',
+                    },
+                    boxShadow: {
+                        neon: '0 0 10px rgba(255, 230, 0, 0.7), 0 0 18px rgba(255, 230, 0, 0.4)',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #181a20;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2b313a;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #474d57;
+        }
+    </style>
+</head>
+<body class="bg-cryptoDark text-gray-200 font-sans min-h-screen flex flex-col antialiased selection:bg-yellow-500 selection:text-black">
+
+    <!-- Header Navigation -->
+    <header class="bg-cryptoCard border-b border-cryptoBorder sticky top-0 z-50 backdrop-blur-md bg-opacity-90">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-yellow-500 p-2 rounded-lg text-black font-bold flex items-center justify-center">
+                    <i class="fa-solid fa-chart-line text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                        幣安 USDT-M 合約 5分鐘動態排行
+                        <span class="text-xs bg-yellow-500/20 text-yellow-400 font-semibold px-2 py-0.5 rounded border border-yellow-500/30">即時監控</span>
+                    </h1>
+                    <p class="text-xs text-gray-400">追蹤近 5 分鐘劇烈波動作標的 | 精確新上榜辨識</p>
+                </div>
+            </div>
+
+            <!-- Global Status & Control -->
+            <div class="flex items-center space-x-3 text-sm">
+                <div class="flex items-center space-x-2 bg-cryptoDark px-3 py-1.5 rounded-lg border border-cryptoBorder">
+                    <span id="statusIndicator" class="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block animate-pulse"></span>
+                    <span id="statusText" class="text-xs font-mono text-gray-300">系統初始化...</span>
+                </div>
+                <button id="refreshBtn" onclick="manualRefresh()" class="bg-yellow-500 hover:bg-yellow-400 text-black px-3 py-1.5 rounded-lg font-semibold text-xs transition flex items-center gap-1 active:scale-95 shadow">
+                    <i class="fa-solid fa-rotate-right" id="refreshIcon"></i>
+                    刷新數據
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full flex flex-col gap-6">
+
+        <!-- Controls Bar: Threshold Filter & Info -->
+        <div class="bg-cryptoCard rounded-xl p-4 border border-cryptoBorder shadow-md flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <label class="block text-xs text-gray-400 font-medium mb-1.5 flex items-center gap-1">
+                    <i class="fa-solid fa-filter text-yellow-500"></i> 4小時成交額篩選 (USDT)
+                </label>
+                <div class="inline-flex flex-wrap gap-2" id="filterGroup">
+                    <button onclick="setVolumeFilter(10000000)" data-vol="10000000" class="filter-btn bg-cryptoDark hover:bg-cryptoBorder text-xs text-gray-300 px-3.5 py-2 rounded-lg font-mono border border-cryptoBorder transition cursor-pointer">
+                        >= 1,000萬
+                    </button>
+                    <button onclick="setVolumeFilter(30000000)" data-vol="30000000" class="filter-btn bg-cryptoDark hover:bg-cryptoBorder text-xs text-gray-300 px-3.5 py-2 rounded-lg font-mono border border-cryptoBorder transition cursor-pointer">
+                        >= 3,000萬
+                    </button>
+                    <button onclick="setVolumeFilter(50000000)" data-vol="50000000" class="filter-btn bg-cryptoDark hover:bg-cryptoBorder text-xs text-gray-300 px-3.5 py-2 rounded-lg font-mono border border-cryptoBorder transition cursor-pointer">
+                        >= 5,000萬
+                    </button>
+                    <button onclick="setVolumeFilter(100000000)" data-vol="100000000" class="filter-btn bg-cryptoDark hover:bg-cryptoBorder text-xs text-gray-300 px-3.5 py-2 rounded-lg font-mono border border-cryptoBorder transition cursor-pointer">
+                        >= 1億
+                    </button>
+                </div>
+            </div>
+
+            <!-- Legend and Info -->
+            <div class="flex flex-wrap items-center gap-4 text-xs text-gray-400 bg-cryptoDark/50 p-2.5 rounded-lg border border-cryptoBorder/60 self-stretch md:self-auto justify-between md:justify-start">
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-yellow-400 text-black shadow-neon animate-pulse">
+                        <i class="fa-solid fa-bolt me-1"></i>新上榜
+                    </span>
+                    <span>: 首次登場/擠進榜單 (維持2小時)</span>
+                </div>
+                <div class="h-3 w-px bg-cryptoBorder hidden sm:block"></div>
+                <div class="flex items-center gap-1 font-mono text-gray-300">
+                    <i class="fa-regular fa-clock text-yellow-500"></i>
+                    <span id="lastUpdatedTime">--:--:--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Bar for Auto Refresh -->
+        <div class="w-full bg-cryptoDark rounded-full h-1 overflow-hidden">
+            <div id="progressBar" class="bg-yellow-500 h-1 transition-all duration-1000 ease-linear" style="width: 100%"></div>
+        </div>
+
+        <!-- Leaderboards Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- Gainers Card -->
+            <div class="bg-cryptoCard rounded-xl border border-cryptoBorder shadow-xl overflow-hidden flex flex-col">
+                <div class="p-4 border-b border-cryptoBorder bg-cryptoDark/30 flex justify-between items-center">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 rounded-full bg-cryptoGreen"></div>
+                        <h2 class="font-bold text-base text-white flex items-center gap-2">
+                            5分鐘 漲幅榜 (Top 10)
+                        </h2>
+                    </div>
+                    <span class="text-xs text-cryptoGreen font-mono bg-cryptoGreen/10 px-2 py-1 rounded border border-cryptoGreen/20">🚀 快速拉升</span>
+                </div>
+
+                <div class="overflow-x-auto flex-1">
+                    <table class="w-full text-left text-xs sm:text-sm">
+                        <thead class="bg-cryptoDark/70 text-gray-400 font-medium border-b border-cryptoBorder">
+                            <tr>
+                                <th class="p-3 pl-4">排名 / 幣種</th>
+                                <th class="p-3 text-right">當前價格</th>
+                                <th class="p-3 text-right">5m 漲跌</th>
+                                <th class="p-3 text-right">4h 成交額</th>
+                                <th class="p-3 text-center pr-4">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="gainersList" class="divide-y divide-cryptoBorder/50 font-mono">
+                            <tr>
+                                <td colspan="5" class="p-8 text-center text-gray-500">
+                                    <i class="fa-solid fa-circle-notch fa-spin text-yellow-500 text-xl mb-2"></i>
+                                    <p>正在讀取合約數據...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Losers Card -->
+            <div class="bg-cryptoCard rounded-xl border border-cryptoBorder shadow-xl overflow-hidden flex flex-col">
+                <div class="p-4 border-b border-cryptoBorder bg-cryptoDark/30 flex justify-between items-center">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 rounded-full bg-cryptoRed"></div>
+                        <h2 class="font-bold text-base text-white flex items-center gap-2">
+                            5分鐘 跌幅榜 (Top 10)
+                        </h2>
+                    </div>
+                    <span class="text-xs text-cryptoRed font-mono bg-cryptoRed/10 px-2 py-1 rounded border border-cryptoRed/20">📉 快速跳水</span>
+                </div>
+
+                <div class="overflow-x-auto flex-1">
+                    <table class="w-full text-left text-xs sm:text-sm">
+                        <thead class="bg-cryptoDark/70 text-gray-400 font-medium border-b border-cryptoBorder">
+                            <tr>
+                                <th class="p-3 pl-4">排名 / 幣種</th>
+                                <th class="p-3 text-right">當前價格</th>
+                                <th class="p-3 text-right">5m 漲跌</th>
+                                <th class="p-3 text-right">4h 成交額</th>
+                                <th class="p-3 text-center pr-4">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="losersList" class="divide-y divide-cryptoBorder/50 font-mono">
+                            <tr>
+                                <td colspan="5" class="p-8 text-center text-gray-500">
+                                    <i class="fa-solid fa-circle-notch fa-spin text-yellow-500 text-xl mb-2"></i>
+                                    <p>正在讀取合約數據...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-cryptoCard border-t border-cryptoBorder mt-8 py-4 text-center text-xs text-gray-500">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+            <div>
+                &copy; Binance Futures 5m Pulse Monitor | 僅供數據交流不構成投資建議
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="resetSnapshot()" class="text-gray-400 hover:text-yellow-400 underline transition cursor-pointer">
+                    重置已知榜單數據 (把當前榜單轉為預設舊榜)
+                </button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Logic Script -->
+    <script>
+        const BINANCE_FUTURES_API = 'https://fapi.binance.com';
+        const REFRESH_INTERVAL = 15; // 15s refresh
+        const NEW_TAG_DURATION = 2 * 60 * 60 * 1000; // 2 hours
+        const STORAGE_KEY = 'binance_futures_tracking_state_v2';
+
+        let currentVolFilter = 10000000; // 10M USDT
+        let countdown = REFRESH_INTERVAL;
+        let timer = null;
+        let isFetching = false;
+
+        /*
+           state structure in localStorage:
+           {
+               knownSymbols: ['BTCUSDT', 'ETHUSDT', ...],  // 已知的榜單成員集合（基準榜單）
+               newEntries: { 'SOLUSDT': 1700000000000 }    // 新擠進榜單的幣種與時間戳記
+           }
+        */
+        let trackingState = {
+            knownSymbols: [],
+            newEntries: {}
+        };
+
+        function loadTrackingState() {
+            try {
+                const stored = localStorage.getItem(STORAGE_KEY);
+                if (stored) {
+                    trackingState = JSON.parse(stored);
+                    if (!Array.isArray(trackingState.knownSymbols)) trackingState.knownSymbols = [];
+                    if (!trackingState.newEntries) trackingState.newEntries = {};
+                }
+            } catch (e) {
+                console.error("Failed to parse local storage", e);
+                trackingState = { knownSymbols: [], newEntries: {} };
+            }
+        }
+
+        function saveTrackingState() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(trackingState));
+            } catch (e) {
+                console.error("Failed to save local storage", e);
+            }
+        }
+
+        function resetSnapshot() {
+            localStorage.removeItem(STORAGE_KEY);
+            trackingState = { knownSymbols: [], newEntries: {} };
+            fetchData();
+            alert("已成功重置！當前榜單將被建立為新的舊榜單基準。");
+        }
+
+        function setVolumeFilter(val) {
+            currentVolFilter = val;
+            
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                const vol = parseInt(btn.getAttribute('data-vol'));
+                if (vol === val) {
+                    btn.classList.add('bg-yellow-500', 'text-black', 'border-yellow-500', 'font-bold');
+                    btn.classList.remove('bg-cryptoDark', 'text-gray-300', 'border-cryptoBorder');
+                } else {
+                    btn.classList.remove('bg-yellow-500', 'text-black', 'border-yellow-500', 'font-bold');
+                    btn.classList.add('bg-cryptoDark', 'text-gray-300', 'border-cryptoBorder');
+                }
+            });
+
+            fetchData();
+        }
+
+        async function fetchData() {
+            if (isFetching) return;
+            isFetching = true;
+
+            const statusIndicator = document.getElementById('statusIndicator');
+            const statusText = document.getElementById('statusText');
+            const refreshIcon = document.getElementById('refreshIcon');
+
+            refreshIcon.classList.add('fa-spin');
+            statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block animate-pulse";
+            statusText.innerText = "更新數據中...";
+
+            try {
+                // 1. Fetch 24h Ticker to filter volume
+                const tickerRes = await fetch(`${BINANCE_FUTURES_API}/fapi/v1/ticker/24hr`);
+                if (!tickerRes.ok) throw new Error("API Network error");
+                const tickers = await tickerRes.json();
+
+                // 2. Filter USDT-M symbols with 4h Volume estimate >= threshold
+                const validTickers = tickers.filter(t => {
+                    const isUsdt = t.symbol.endsWith('USDT');
+                    const estimated4hVol = parseFloat(t.quoteVolume) / 6;
+                    return isUsdt && estimated4hVol >= currentVolFilter;
+                });
+
+                validTickers.sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume));
+                const candidates = validTickers.slice(0, 80); // Inspect top 80 liquidity pairs
+
+                // 3. Fetch latest 2 5m candles to accurately measure 5m price delta
+                const metrics = await Promise.all(candidates.map(async (t) => {
+                    try {
+                        const klineRes = await fetch(`${BINANCE_FUTURES_API}/fapi/v1/klines?symbol=${t.symbol}&interval=5m&limit=2`);
+                        const klines = await klineRes.json();
+                        
+                        if (klines && klines.length >= 2) {
+                            const lastCandle = klines[1]; 
+                            const prevCandle = klines[0]; 
+                            const currentPrice = parseFloat(lastCandle[4]);
+                            const openPrice5mAgo = parseFloat(prevCandle[1]);
+                            
+                            const changePercent = ((currentPrice - openPrice5mAgo) / openPrice5mAgo) * 100;
+                            const est4hVol = parseFloat(t.quoteVolume) / 6;
+
+                            return {
+                                symbol: t.symbol,
+                                price: currentPrice,
+                                change5m: changePercent,
+                                vol4h: est4hVol,
+                            };
+                        }
+                    } catch (e) {
+                        return null;
+                    }
+                    return null;
+                }));
+
+                const filteredMetrics = metrics.filter(m => m !== null);
+
+                // Sort Top 10 Gainers & Losers
+                const gainers = [...filteredMetrics].sort((a, b) => b.change5m - a.change5m).slice(0, 10);
+                const losers = [...filteredMetrics].sort((a, b) => a.change5m - b.change5m).slice(0, 10);
+
+                // Process New Tag Logic cleanly
+                updateLeaderboardState([...gainers, ...losers]);
+
+                // Render UI Tables
+                renderList('gainersList', gainers);
+                renderList('losersList', losers);
+
+                // Update UI Status
+                statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-cryptoGreen inline-block";
+                statusText.innerText = "連線正常";
+                document.getElementById('lastUpdatedTime').innerText = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+
+                countdown = REFRESH_INTERVAL;
+
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                statusIndicator.className = "w-2.5 h-2.5 rounded-full bg-cryptoRed inline-block";
+                statusText.innerText = "讀取失敗 (重試中)";
+            } finally {
+                refreshIcon.classList.remove('fa-spin');
+                isFetching = false;
+            }
+        }
+
+        // Logic for "New Entrant" calculation
+        function updateLeaderboardState(currentTopList) {
+            const now = Date.now();
+            const currentSymbols = currentTopList.map(item => item.symbol);
+            const currentSymbolSet = new Set(currentSymbols);
+
+            // Case 1: First Initial Snapshot (No prior state recorded)
+            if (trackingState.knownSymbols.length === 0) {
+                // Initialize current top symbols directly as known symbols.
+                // NO "NEW" tag will be assigned on first load!
+                trackingState.knownSymbols = Array.from(currentSymbolSet);
+                trackingState.newEntries = {};
+                saveTrackingState();
+                return;
+            }
+
+            // Case 2: Subsequent updates - detect newly squeezed-in symbols
+            const knownSet = new Set(trackingState.knownSymbols);
+
+            currentSymbols.forEach(symbol => {
+                // If symbol was NOT in knownSymbols and NOT currently in newEntries -> Fresh New Entrant!
+                if (!knownSet.has(symbol) && !trackingState.newEntries[symbol]) {
+                    trackingState.newEntries[symbol] = now;
+                }
+            });
+
+            // Clean up: If a symbol is NO LONGER in the current Top 10 list, remove its new entry state & known state
+            // So if it enters again later, it will correctly be treated as a new entrant.
+            Object.keys(trackingState.newEntries).forEach(symbol => {
+                if (!currentSymbolSet.has(symbol)) {
+                    delete trackingState.newEntries[symbol];
+                }
+            });
+
+            // Keep tracking known symbols set updated
+            currentSymbolSet.forEach(s => knownSet.add(s));
+            
+            // Clean up known set for symbols that left the top 10
+            trackingState.knownSymbols = Array.from(knownSet).filter(s => currentSymbolSet.has(s));
+
+            saveTrackingState();
+        }
+
+        function formatVol(val) {
+            if (val >= 1e8) {
+                return (val / 1e8).toFixed(2) + ' 億';
+            }
+            if (val >= 1e4) {
+                return (val / 1e4).toFixed(0) + ' 萬';
+            }
+            return val.toFixed(0);
+        }
+
+        function formatPrice(price) {
+            if (price >= 1000) return price.toFixed(2);
+            if (price >= 1) return price.toFixed(4);
+            return price.toFixed(6);
+        }
+
+        function renderList(elementId, items) {
+            const tbody = document.getElementById(elementId);
+            const now = Date.now();
+
+            if (items.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-500">此篩選條件下無符合幣種</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = items.map((item, index) => {
+                const newTimestamp = trackingState.newEntries[item.symbol];
+                // Display NEW tag if added within NEW_TAG_DURATION (2 hrs)
+                const isNew = newTimestamp && (now - newTimestamp <= NEW_TAG_DURATION);
+
+                const cleanSymbol = item.symbol.replace('USDT', '');
+                const binanceUrl = `https://www.binance.com/zh-TC/futures/${item.symbol}`;
+
+                const changeClass = item.change5m >= 0 ? 'text-cryptoGreen' : 'text-cryptoRed';
+                const changeSign = item.change5m >= 0 ? '+' : '';
+
+                return `
+                    <tr class="hover:bg-cryptoDark/50 transition">
+                        <td class="p-3 pl-4 font-semibold">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-gray-500 w-4">${index + 1}</span>
+                                <span class="text-white font-bold">${cleanSymbol}</span>
+                                <span class="text-[10px] text-gray-400">/USDT</span>
+                                ${isNew ? `
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-neonYellow text-black shadow-neon animate-pulse me-1">
+                                        <i class="fa-solid fa-bolt me-0.5"></i>新上榜
+                                    </span>
+                                ` : ''}
+                            </div>
+                        </td>
+                        <td class="p-3 text-right text-gray-200">
+                            $${formatPrice(item.price)}
+                        </td>
+                        <td class="p-3 text-right font-bold ${changeClass}">
+                            ${changeSign}${item.change5m.toFixed(2)}%
+                        </td>
+                        <td class="p-3 text-right text-gray-400 text-xs">
+                            $${formatVol(item.vol4h)}
+                        </td>
+                        <td class="p-3 text-center pr-4">
+                            <a href="${binanceUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center bg-cryptoBorder hover:bg-yellow-500 hover:text-black text-xs px-2.5 py-1 rounded text-gray-300 font-sans transition">
+                                交易 <i class="fa-solid fa-arrow-up-right-from-square text-[10px] ms-1"></i>
+                            </a>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function manualRefresh() {
+            fetchData();
+        }
+
+        function startTimer() {
+            if (timer) clearInterval(timer);
+            timer = setInterval(() => {
+                countdown--;
+                const bar = document.getElementById('progressBar');
+                if (bar) {
+                    const percent = (countdown / REFRESH_INTERVAL) * 100;
+                    bar.style.width = `${percent}%`;
+                }
+
+                if (countdown <= 0) {
+                    fetchData();
+                }
+            }, 1000);
+        }
+
+        window.onload = function() {
+            loadTrackingState();
+            setVolumeFilter(10000000);
+            startTimer();
+        };
+    </script>
+</body>
+</html>
