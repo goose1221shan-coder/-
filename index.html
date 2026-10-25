@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>幣安永續合約 2h 內 5m 漲跌極限榜</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        binance: {
+                            gold: '#F0B90B',
+                            goldHover: '#FCD535',
+                            green: '#0ECB81',
+                            red: '#F6465D',
+                            darkBg: '#0B0E11',
+                            cardBg: '#181A20',
+                            panelBg: '#1E2329',
+                            border: '#2B313A',
+                            hover: '#2B313A',
+                            subText: '#848E9C'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar for subtle dark UI */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0B0E11;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2B313A;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #474D57;
+        }
+    </style>
+</head>
+<body class="bg-binance-darkBg text-gray-100 min-h-screen font-sans antialiased selection:bg-binance-gold selection:text-black">
+
+    <!-- Header Navigation -->
+    <header class="border-b border-binance-border bg-binance-cardBg/90 backdrop-blur-md sticky top-0 z-30 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-col md:flex-row justify-between items-center gap-4">
+            
+            <!-- Logo & Title -->
+            <div class="flex items-center space-x-3 w-full md:w-auto justify-between md:justify-start">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-binance-gold text-black p-2 rounded-xl font-black shadow-md shadow-binance-gold/10 flex items-center justify-center">
+                        <i data-lucide="zap" class="w-6 h-6 fill-current"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg md:text-xl leading-tight flex items-center gap-2">
+                            幣安永續合約 5m 極刻監控
+                            <span class="text-xs font-mono font-medium bg-binance-gold/15 text-binance-gold border border-binance-gold/30 px-2 py-0.5 rounded-full">USDT-M</span>
+                        </h1>
+                        <p class="text-xs text-binance-subText">監控過去 2 小時（24 根 5m K 棒）單根極值爆拉 / 急殺</p>
+                    </div>
+                </div>
+
+                <!-- Mobile Quick Refresh -->
+                <button id="mobile-refresh-btn" class="md:hidden p-2 rounded-lg bg-binance-panelBg border border-binance-border text-binance-gold active:scale-95 transition">
+                    <i data-lucide="rotate-cw" class="w-5 h-5" id="mobile-refresh-icon"></i>
+                </button>
+            </div>
+
+            <!-- Global Controls -->
+            <div class="flex items-center flex-wrap gap-2 sm:gap-3 w-full md:w-auto justify-end">
+                <!-- Search Input -->
+                <div class="relative flex-1 sm:flex-initial">
+                    <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-binance-subText"></i>
+                    <input type="text" id="search-input" placeholder="搜尋幣種 (如 BTC)..." class="w-full sm:w-44 bg-binance-darkBg border border-binance-border focus:border-binance-gold rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder-binance-subText focus:outline-none transition">
+                </div>
+
+                <!-- Min Volume Filter -->
+                <div class="flex items-center bg-binance-darkBg border border-binance-border rounded-lg px-2.5 py-1.5 text-xs text-gray-300">
+                    <i data-lucide="filter" class="w-3.5 h-3.5 mr-1.5 text-binance-subText"></i>
+                    <span class="mr-1 text-binance-subText hidden sm:inline">24h量:</span>
+                    <select id="min-volume" class="bg-transparent text-white font-mono focus:outline-none cursor-pointer">
+                        <option value="1000000" class="bg-binance-cardBg">≥ 100萬</option>
+                        <option value="5000000" class="bg-binance-cardBg">≥ 500萬</option>
+                        <option value="10000000" selected class="bg-binance-cardBg">≥ 1000萬</option>
+                        <option value="50000000" class="bg-binance-cardBg">≥ 5000萬</option>
+                    </select>
+                </div>
+
+                <!-- Refresh Rate Filter -->
+                <div class="flex items-center bg-binance-darkBg border border-binance-border rounded-lg px-2.5 py-1.5 text-xs text-gray-300">
+                    <i data-lucide="timer" class="w-3.5 h-3.5 mr-1.5 text-binance-subText"></i>
+                    <span class="mr-1 text-binance-subText hidden sm:inline">頻率:</span>
+                    <select id="refresh-rate" class="bg-transparent text-white font-mono focus:outline-none cursor-pointer">
+                        <option value="15000" selected class="bg-binance-cardBg">15 秒</option>
+                        <option value="30000" class="bg-binance-cardBg">30 秒</option>
+                        <option value="60000" class="bg-binance-cardBg">60 秒</option>
+                    </select>
+                </div>
+
+                <!-- Manual Refresh Button -->
+                <button id="manual-refresh-btn" class="hidden md:flex bg-binance-gold hover:bg-binance-goldHover text-black font-semibold text-xs px-3.5 py-1.5 rounded-lg items-center transition shadow-md active:scale-95">
+                    <i data-lucide="rotate-cw" class="w-3.5 h-3.5 mr-1.5" id="refresh-icon"></i>
+                    <span>立即刷新</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+        <!-- Status KPI Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <!-- Active Contracts -->
+            <div class="bg-binance-cardBg border border-binance-border rounded-xl p-4 flex items-center justify-between shadow-sm hover:border-binance-gold/30 transition">
+                <div>
+                    <div class="text-xs text-binance-subText mb-1">活躍永續合約對</div>
+                    <div class="text-xl font-bold font-mono text-white" id="stat-active-symbols">載入中...</div>
+                </div>
+                <div class="p-3 bg-binance-darkBg rounded-lg text-binance-gold border border-binance-border">
+                    <i data-lucide="layers" class="w-5 h-5"></i>
+                </div>
+            </div>
+
+            <!-- Filtered Target Contracts -->
+            <div class="bg-binance-cardBg border border-binance-border rounded-xl p-4 flex items-center justify-between shadow-sm hover:border-binance-gold/30 transition">
+                <div>
+                    <div class="text-xs text-binance-subText mb-1">符合條件標的</div>
+                    <div class="text-xl font-bold font-mono text-white" id="stat-filtered-symbols">--</div>
+                </div>
+                <div class="p-3 bg-binance-darkBg rounded-lg text-cyan-400 border border-binance-border">
+                    <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+                </div>
+            </div>
+
+            <!-- Scan Progress Bar -->
+            <div class="bg-binance-cardBg border border-binance-border rounded-xl p-4 flex items-center justify-between shadow-sm hover:border-binance-gold/30 transition">
+                <div class="w-full pr-3">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs text-binance-subText">K線掃描狀態</span>
+                        <span class="text-xs font-mono text-blue-400" id="stat-progress-percent">0%</span>
+                    </div>
+                    <div class="text-sm font-bold font-mono text-blue-400 truncate" id="stat-progress">準備中</div>
+                    <div class="w-full bg-binance-darkBg h-1.5 rounded-full mt-2 overflow-hidden border border-binance-border">
+                        <div id="progress-bar" class="bg-blue-500 h-full w-0 transition-all duration-300"></div>
+                    </div>
+                </div>
+                <div class="p-3 bg-binance-darkBg rounded-lg text-blue-400 border border-binance-border shrink-0">
+                    <i data-lucide="activity" class="w-5 h-5 animate-pulse"></i>
+                </div>
+            </div>
+
+            <!-- Last Update Time -->
+            <div class="bg-binance-cardBg border border-binance-border rounded-xl p-4 flex items-center justify-between shadow-sm hover:border-binance-gold/30 transition">
+                <div>
+                    <div class="text-xs text-binance-subText mb-1">數據更新時間</div>
+                    <div class="text-base font-bold font-mono text-gray-200" id="stat-last-update">--:--:--</div>
+                </div>
+                <div class="p-3 bg-binance-darkBg rounded-lg text-purple-400 border border-binance-border">
+                    <i data-lucide="clock" class="w-5 h-5"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leaderboard Main Tables (Gainers & Losers) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- 2H Max 5m Gainer Top 10 -->
+            <div class="bg-binance-cardBg border border-binance-border rounded-xl shadow-lg overflow-hidden flex flex-col">
+                <div class="px-5 py-3.5 border-b border-binance-border flex justify-between items-center bg-binance-green/5">
+                    <div class="flex items-center space-x-2">
+                        <div class="p-1.5 bg-binance-green/10 rounded-lg">
+                            <i data-lucide="trending-up" class="w-5 h-5 text-binance-green"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-bold text-white text-base">2h 內最大 5m 爆拉榜</h2>
+                            <p class="text-[11px] text-binance-subText">單根 5 分鐘最大拉升幅度</p>
+                        </div>
+                    </div>
+                    <span class="text-xs bg-binance-green/20 text-binance-green border border-binance-green/30 px-2.5 py-0.5 rounded-full font-mono font-bold">TOP 10</span>
+                </div>
+
+                <div class="overflow-x-auto flex-1">
+                    <table class="w-full text-left text-sm">
+                        <thead class="text-[11px] text-binance-subText bg-binance-darkBg/80 uppercase border-b border-binance-border font-mono tracking-wider">
+                            <tr>
+                                <th class="py-3 px-4"># 合約交易對</th>
+                                <th class="py-3 px-4 text-right">最新價格</th>
+                                <th class="py-3 px-4 text-right">2h內單根最大5m漲幅</th>
+                                <th class="py-3 px-4 text-right">24h 成交額</th>
+                            </tr>
+                        </thead>
+                        <tbody id="gainers-tbody" class="divide-y divide-binance-border/40 font-mono text-xs">
+                            <tr>
+                                <td colspan="4" class="py-12 text-center text-binance-subText">
+                                    <div class="flex flex-col items-center justify-center space-y-2">
+                                        <i data-lucide="loader-2" class="w-6 h-6 animate-spin text-binance-gold"></i>
+                                        <span>正在抓取幣安永續合約 K 線數據...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 2H Max 5m Loser Top 10 -->
+            <div class="bg-binance-cardBg border border-binance-border rounded-xl shadow-lg overflow-hidden flex flex-col">
+                <div class="px-5 py-3.5 border-b border-binance-border flex justify-between items-center bg-binance-red/5">
+                    <div class="flex items-center space-x-2">
+                        <div class="p-1.5 bg-binance-red/10 rounded-lg">
+                            <i data-lucide="trending-down" class="w-5 h-5 text-binance-red"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-bold text-white text-base">2h 內最大 5m 急殺榜</h2>
+                            <p class="text-[11px] text-binance-subText">單根 5 分鐘最大下跌幅度</p>
+                        </div>
+                    </div>
+                    <span class="text-xs bg-binance-red/20 text-binance-red border border-binance-red/30 px-2.5 py-0.5 rounded-full font-mono font-bold">TOP 10</span>
+                </div>
+
+                <div class="overflow-x-auto flex-1">
+                    <table class="w-full text-left text-sm">
+                        <thead class="text-[11px] text-binance-subText bg-binance-darkBg/80 uppercase border-b border-binance-border font-mono tracking-wider">
+                            <tr>
+                                <th class="py-3 px-4"># 合約交易對</th>
+                                <th class="py-3 px-4 text-right">最新價格</th>
+                                <th class="py-3 px-4 text-right">2h內單根最大5m跌幅</th>
+                                <th class="py-3 px-4 text-right">24h 成交額</th>
+                            </tr>
+                        </thead>
+                        <tbody id="losers-tbody" class="divide-y divide-binance-border/40 font-mono text-xs">
+                            <tr>
+                                <td colspan="4" class="py-12 text-center text-binance-subText">
+                                    <div class="flex flex-col items-center justify-center space-y-2">
+                                        <i data-lucide="loader-2" class="w-6 h-6 animate-spin text-binance-gold"></i>
+                                        <span>正在抓取幣安永續合約 K 線數據...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        let activeTradingSymbols = new Set();
+        let cachedMarketData = [];
+        let refreshTimer = null;
+        let isFetching = false;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            lucide.createIcons();
+            await fetchActiveSymbols();
+            await updateMarketData();
+            setupEventListeners();
+            startAutoRefresh();
+        });
+
+        // 1. Fetch Binance USDT-M Perpetual Active Symbols (TRADING status only)
+        async function fetchActiveSymbols() {
+            try {
+                const res = await fetch('https://fapi.binance.com/fapi/v1/exchangeInfo');
+                if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+                const data = await res.json();
+                
+                activeTradingSymbols.clear();
+                data.symbols.forEach(s => {
+                    // Strictly filter active USDT-M Perpetual Trading pairs
+                    if (
+                        s.quoteAsset === 'USDT' &&
+                        s.status === 'TRADING' &&
+                        s.contractType === 'PERPETUAL'
+                    ) {
+                        activeTradingSymbols.add(s.symbol);
+                    }
+                });
+
+                document.getElementById('stat-active-symbols').innerText = `${activeTradingSymbols.size} 個`;
+            } catch (err) {
+                console.error('無法取得幣安合約清單:', err);
+                document.getElementById('stat-active-symbols').innerText = '載入失敗';
+            }
+        }
+
+        // 2. Fetch 2h (24 x 5m K-lines) and Calculate Max 5m Spike/Dump
+        async function updateMarketData() {
+            if (isFetching || activeTradingSymbols.size === 0) return;
+            isFetching = true;
+            
+            const refreshIcon = document.getElementById('refresh-icon');
+            const mobileRefreshIcon = document.getElementById('mobile-refresh-icon');
+            if (refreshIcon) refreshIcon.classList.add('animate-spin');
+            if (mobileRefreshIcon) mobileRefreshIcon.classList.add('animate-spin');
+
+            try {
+                // Fetch 24h Ticker statistics for all USDT-M futures
+                const res24h = await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr');
+                if (!res24h.ok) throw new Error(`HTTP Error: ${res24h.status}`);
+                const tickers = await res24h.json();
+
+                const minVol = parseFloat(document.getElementById('min-volume').value);
+                
+                // Filter tickers matching active symbols and volume criteria
+                const filteredTickers = tickers.filter(t => 
+                    activeTradingSymbols.has(t.symbol) && 
+                    parseFloat(t.quoteVolume) >= minVol
+                );
+
+                document.getElementById('stat-filtered-symbols').innerText = `${filteredTickers.length} 個`;
+
+                const batchSize = 20; // Concurrent API batching to prevent rate-limit throttling
+                let updatedData = [];
+                let completedCount = 0;
+
+                for (let i = 0; i < filteredTickers.length; i += batchSize) {
+                    const batch = filteredTickers.slice(i, i + batchSize);
+                    
+                    // Limit=24 means 24 * 5m = 120m (2 hours)
+                    const klinePromises = batch.map(t => 
+                        fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${t.symbol}&interval=5m&limit=24`)
+                            .then(r => r.ok ? r.json() : null)
+                            .then(klines => ({ symbol: t.symbol, ticker: t, klines }))
+                            .catch(() => null)
+                    );
+
+                    const results = await Promise.all(klinePromises);
+
+                    results.forEach(res => {
+                        if (!res || !res.klines || !Array.isArray(res.klines) || res.klines.length === 0) return;
+                        
+                        let best5m = -999;
+                        let worst5m = 999;
+
+                        // Calculate max single 5m change inside the 2-hour window (24 klines)
+                        res.klines.forEach(k => {
+                            const open = parseFloat(k[1]);
+                            const close = parseFloat(k[4]);
+                            if (open > 0) {
+                                const chg = ((close - open) / open) * 100;
+                                if (chg > best5m) best5m = chg;
+                                if (chg < worst5m) worst5m = chg;
+                            }
+                        });
+
+                        updatedData.push({
+                            symbol: res.symbol,
+                            price: parseFloat(res.ticker.lastPrice),
+                            best5m: best5m,   // Max 5m spike % in 2 hours
+                            worst5m: worst5m, // Max 5m dump % in 2 hours
+                            volume24h: parseFloat(res.ticker.quoteVolume)
+                        });
+                    });
+
+                    completedCount += batch.length;
+                    const percent = Math.min(100, Math.round((completedCount / filteredTickers.length) * 100));
+                    document.getElementById('stat-progress').innerText = `${completedCount} / ${filteredTickers.length}`;
+                    document.getElementById('stat-progress-percent').innerText = `${percent}%`;
+                    document.getElementById('progress-bar').style.width = `${percent}%`;
+                }
+
+                cachedMarketData = updatedData;
+                document.getElementById('stat-progress').innerText = '完成';
+                document.getElementById('stat-last-update').innerText = new Date().toLocaleTimeString();
+
+                renderFilteredData();
+
+            } catch (err) {
+                console.error('更新合約數據失敗:', err);
+                document.getElementById('stat-progress').innerText = '錯誤';
+            } flexFinally: {
+                isFetching = false;
+                if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+                if (mobileRefreshIcon) mobileRefreshIcon.classList.remove('animate-spin');
+            }
+        }
+
+        // 3. Filter and Render UI Tables
+        function renderFilteredData() {
+            const searchQuery = document.getElementById('search-input').value.trim().toUpperCase();
+            
+            let data = cachedMarketData;
+            if (searchQuery) {
+                data = data.filter(d => d.symbol.includes(searchQuery));
+            }
+
+            const gainers = [...data].sort((a, b) => b.best5m - a.best5m).slice(0, 10);
+            const losers = [...data].sort((a, b) => a.worst5m - b.worst5m).slice(0, 10);
+
+            renderTbody('gainers-tbody', gainers, true);
+            renderTbody('losers-tbody', losers, false);
+        }
+
+        function renderTbody(elementId, items, isGainer) {
+            const tbody = document.getElementById(elementId);
+            if (!tbody) return;
+
+            if (items.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-binance-subText">目前尚無符合條件的數據</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = items.map((item, index) => {
+                const val = isGainer ? item.best5m : item.worst5m;
+                const changeColor = val >= 0 ? 'text-binance-green' : 'text-binance-red';
+                const bgTagColor = val >= 0 ? 'bg-binance-green/10 text-binance-green' : 'bg-binance-red/10 text-binance-red';
+                const changeSign = val >= 0 ? '+' : '';
+                
+                // Smart price precision formatting
+                let formatPrice;
+                if (item.price >= 1000) formatPrice = item.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                else if (item.price >= 1) formatPrice = item.price.toFixed(4);
+                else formatPrice = item.price.toFixed(6);
+
+                const formatVol = (item.volume24h / 1000000).toFixed(2);
+                
+                // Binance Official Futures Direct Trading Interface URL
+                const futuresUrl = `https://www.binance.com/zh-TC/futures/${item.symbol}`;
+
+                return `
+                    <tr class="hover:bg-binance-hover/60 transition-colors group">
+                        <td class="py-3 px-4 flex items-center space-x-2.5">
+                            <span class="text-xs font-bold text-binance-subText w-5">${index + 1}</span>
+                            <a href="${futuresUrl}" 
+                               target="_blank" 
+                               rel="noopener noreferrer"
+                               title="前往幣安合約交易 ${item.symbol}"
+                               class="font-bold text-white group-hover:text-binance-gold flex items-center gap-1.5 transition">
+                                <span>${item.symbol}</span>
+                                <i data-lucide="external-link" class="w-3 h-3 text-binance-subText group-hover:text-binance-gold transition"></i>
+                            </a>
+                        </td>
+                        <td class="py-3 px-4 text-right font-bold text-gray-200">$${formatPrice}</td>
+                        <td class="py-3 px-4 text-right">
+                            <span class="inline-block px-2 py-0.5 rounded font-bold ${bgTagColor}">
+                                ${changeSign}${val.toFixed(2)}%
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 text-right text-binance-subText font-mono">
+                            $${formatVol}M
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        function setupEventListeners() {
+            document.getElementById('manual-refresh-btn').addEventListener('click', updateMarketData);
+            document.getElementById('mobile-refresh-btn').addEventListener('click', updateMarketData);
+            document.getElementById('min-volume').addEventListener('change', updateMarketData);
+            document.getElementById('refresh-rate').addEventListener('change', startAutoRefresh);
+            document.getElementById('search-input').addEventListener('input', renderFilteredData);
+        }
+
+        function startAutoRefresh() {
+            if (refreshTimer) clearInterval(refreshTimer);
+            const rate = parseInt(document.getElementById('refresh-rate').value);
+            refreshTimer = setInterval(updateMarketData, rate);
+        }
+    </script>
+</body>
+</html>
