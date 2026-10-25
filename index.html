@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>幣安合約漲跌幅榜</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#1b2430;--mute:#6b7685;--line:#e3e7ec;--up:#0f9d6b;--down:#d6334a;--warn:#c27a00;--accent:#1b2430;color-scheme:light}
+:root[data-theme="dark"]{--bg:#10151c;--panel:#171e27;--ink:#e6ebf1;--mute:#8a96a6;--line:#262f3b;--up:#2fd08f;--down:#ff5c70;--warn:#f0b64a;--accent:#e6ebf1;color-scheme:dark}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151c;--panel:#171e27;--ink:#e6ebf1;--mute:#8a96a6;--line:#262f3b;--up:#2fd08f;--down:#ff5c70;--warn:#f0b64a;--accent:#e6ebf1;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif}
+.wrap{max-width:1400px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:22px;margin:0 0 4px}
+.sub{color:var(--mute);font-size:13px;margin:0 0 18px}
+.bar{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;margin-bottom:12px}
+.group{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.group button{border:0;background:none;color:var(--mute);padding:7px 13px;font:inherit;cursor:pointer;border-right:1px solid var(--line)}
+.group button:last-child{border-right:0}
+.group button.on{background:var(--accent);color:var(--bg);font-weight:600}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--up);outline-offset:2px}
+.chip{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 12px;font-size:14px}
+.chip input[type=number]{width:56px;font:inherit;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);padding:2px 6px}
+.chip button{border:0;background:none;color:var(--ink);font:inherit;cursor:pointer;padding:0}
+.status{margin-left:auto;color:var(--mute);font-size:13px}
+.grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px}
+@media(min-width:1300px){.grid{grid-template-columns:1fr 1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.panel h2{font-size:15px;margin:0;padding:12px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.up h2{color:var(--up)}.down h2{color:var(--down)}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:8px 12px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line);vertical-align:middle}
+th{color:var(--mute);font-weight:500;font-size:12px}
+th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+td:first-child{color:var(--mute);width:28px;padding-right:0}
+tr:last-child td{border-bottom:0}
+td a{color:var(--ink);font-weight:600;text-decoration:none;border-bottom:1px dashed var(--mute)}
+td a:hover{color:var(--up)}
+.u{color:var(--up)}.d{color:var(--down)}.w{color:var(--warn);font-weight:600}
+.chg{font-weight:600}
+td small{display:block;color:var(--mute);font-size:11px;line-height:1.2}
+.new{background:#1b2430;color:#ffe100;border:1px solid rgba(255,225,0,.5);text-shadow:0 0 6px rgba(255,225,0,.8);font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;margin-left:6px}
+.price{color:var(--up);font-weight:700}
+.pct{font-size:13px;font-weight:400;color:var(--mute)}
+.pct input{width:60px;font:inherit;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);padding:2px 6px}
+.dist{font-weight:600}
+.act{width:64px}
+.act button{border:0;background:none;color:var(--mute);cursor:pointer;font-size:15px;padding:2px 5px}
+.act button:hover{color:var(--ink)}
+.act .on{color:var(--warn)}
+.empty,.err{padding:20px 14px;color:var(--mute)}
+.err{color:var(--down);margin-bottom:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+#alerts{margin:0 0 4px;padding:0;list-style:none;font-size:13px}
+#alerts li{padding:5px 12px;margin-bottom:4px;border-left:3px solid var(--warn);background:var(--panel);border-radius:0 6px 6px 0}
+#alerts a{color:var(--ink);font-weight:600}
+#hiddenBox{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px}
+#hiddenBox button{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:3px 10px;cursor:pointer;font:inherit;font-size:13px}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.tbtn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:6px 14px;font:inherit;font-size:14px;cursor:pointer}
+#volPanel h2{color:var(--warn)}
+.note{margin-top:18px;color:var(--mute);font-size:12px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><h1>幣安 U 本位合約｜漲跌幅榜</h1><button class="tbtn" id="theme" aria-label="切換日間／夜間模式"></button></div>
+  <p class="sub">統計近 4 小時內的 K 線，點代號直接開啟合約交易介面。</p>
+
+  <div class="bar">
+    <div class="group" id="vol" role="group" aria-label="12 小時成交額">
+      <button data-v="30000000">12h 成交額 ≥ 3000萬</button>
+      <button data-v="50000000">≥ 5000萬</button>
+      <button data-v="100000000">≥ 1億</button>
+    </div>
+    <div class="group" id="iv" role="group" aria-label="K 線週期">
+      <button data-v="5m">5分</button>
+      <button data-v="15m">15分</button>
+      <button data-v="30m">30分</button>
+      <button data-v="1h">1小時</button>
+    </div>
+    <div class="group" id="mode" role="group" aria-label="排序方式">
+      <button data-v="max">4h 內最大單根</button>
+      <button data-v="last">最新一根</button>
+    </div>
+  </div>
+  <div class="bar">
+    <label class="chip"><input type="checkbox" id="notify"> 提醒：單根漲跌超過
+      <input type="number" id="thr" min="0.5" step="0.5"> %</label>
+    <label class="chip"><input type="checkbox" id="vnotify"> 提醒：15 分 K 成交額超過
+      <input type="number" id="vthr" min="10" step="100"> 萬 USDT</label>
+    <label class="chip">15 分 K 榜單排除市值超過 <input type="number" id="mcap" min="0" step="10"> 億美元</label>
+    <label class="chip">高低點區間 <input type="number" id="days" min="1" max="365" step="1"> 日</label>
+    <div class="chip"><button id="hidBtn">已隱藏 0 個</button></div>
+    <div class="status" id="status">載入中…</div>
+  </div>
+
+  <div id="error"></div>
+  <ul id="alerts"></ul>
+  <div id="hiddenBox" hidden></div>
+
+  <section class="panel" id="pinPanel" hidden style="margin-top:16px"><h2>★ 自選（顯示最新一根）</h2><div class="scroll" id="pins"></div></section>
+
+  <section class="panel" id="volPanel" style="margin-top:16px"><h2 id="vT"></h2><div class="scroll" id="vols"></div></section>
+
+  <div class="grid">
+    <section class="panel up"><h2 id="gT"></h2><div class="scroll" id="gainers"></div></section>
+    <section class="panel down"><h2 id="lT"></h2><div class="scroll" id="losers"></div></section>
+  </div>
+
+  <div class="grid">
+    <section class="panel down"><h2><span id="loT"></span><label class="pct">距離低點 ≤ <input type="number" id="loPct" min="0.1" step="0.5"> %</label></h2><div class="scroll" id="lows"></div></section>
+    <section class="panel up"><h2><span id="hiT"></span><label class="pct">距離高點 ≤ <input type="number" id="hiPct" min="0.1" step="0.5"> %</label></h2><div class="scroll" id="highs"></div></section>
+  </div>
+
+  <p class="note">
+    <b>資金費率</b>：正值代表多頭付費給空頭，數值偏高（≥0.05% 以橘色標示）常見於多頭擁擠，追多風險較高。<br>
+    <b>持倉量變化</b>：統計同一個 4 小時視窗。價格漲＋OI 增加＝新多進場；價格漲＋OI 減少＝空單回補；價格跌＋OI 增加＝新空進場；價格跌＋OI 減少＝多單平倉。<br>
+    <b>新</b>：10 分鐘內剛進入榜單的合約。<br>
+    <b>接近 N 日低／高點</b>：以「當前時間往前推 N 天」的最低／最高價計算，N 可在上方「高低點區間」自訂（1–365 日；60 日內用 4 小時 K、更長用日 K，起點最多差一根 K 線）。現價高於低點（或低於高點）的幅度在設定的 % 以內就會列出；每個合約只會歸到較靠近的一邊（區間位置 &lt; 50% 算低點區、≥ 50% 算高點區）。區間位置 0% = 區間最低、100% = 區間最高；振幅是區間最高價相對最低價的幅度。依距離由近到遠排序、最多顯示 20 個；不受上方 12h 成交額篩選限制，涵蓋所有 U 本位永續合約（只排除你隱藏的）；資料每 30 分鐘更新一次，第一次全部載入約需一到兩分鐘，為避免被幣安限流會放慢逐筆抓取。<br>
+    <b>15 分 K 成交額</b>：以 USDT 成交額計算，列出上一根或進行中的 15 分鐘 K 線成交額超過門檻的合約（不受 12h 成交額篩選限制；會排除隱藏的合約、BTC、ETH，以及市值超過設定值的合約，預設 100 億美元，設 0 代表不用市值排除。市值取自 CoinGecko 前 100 名、以代號比對，每 6 小時更新一次）；勾選提醒後，每根 K 線第一次超過門檻時會響聲並通知。<br>
+    <b>★</b> 釘選自選，<b>✕</b> 隱藏該合約。設定會存在這個瀏覽器。每 30 秒自動更新。
+  </p>
+</div>
+
+<script>
+const API = "https://fapi.binance.com";
+const IV = {"5m":5,"15m":15,"30m":30,"1h":60};
+const IVL = {"5m":"5 分鐘","15m":"15 分鐘","30m":"30 分鐘","1h":"1 小時"};
+const PRE = 30e6;                       // 預篩：24h 成交額低於 3000萬，12h 一定不到
+const def = {minVol:30e6, mode:"max", iv:"5m", thr:10, days:30, vthr:1000, mcap:100, vnotify:false, theme:"auto", lowPct:10, highPct:10, notify:false, pins:[], hidden:[]};
+let S = {...def};
+try{ Object.assign(S, JSON.parse(localStorage.getItem("bm2")||"{}")); }catch(e){}
+const save = () => { try{ localStorage.setItem("bm2", JSON.stringify(S)); }catch(e){} };
+
+let rows = [], busy = false, again = false, armed = false, seen = {}, ctx = null;
+const oi = {}, alerted = new Set(), log = [];
+const $ = id => document.getElementById(id);
+const win = () => 240 / IV[S.iv];
+const fmtVol = v => v >= 1e8 ? (v/1e8).toFixed(2)+" 億" : (v/1e4).toFixed(0)+" 萬";
+const fmtPrice = p => { const n = +p; return n >= 100 ? n.toFixed(2) : n >= 1 ? n.toFixed(4) : n >= 0.01 ? n.toFixed(5) : n.toPrecision(4); };
+const fmtTime = t => new Date(t).toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit",hour12:false});
+const sgn = n => (n > 0 ? "+" : "") + n.toFixed(2) + "%";
+const link = s => `https://www.binance.com/zh-TC/futures/${s}`;
+
+async function getJSON(path){
+  const r = await fetch(API + path);
+  if(!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+
+async function load(){
+  if(busy){ again = true; return; }
+  busy = true;
+  $("status").textContent = "更新中…";
+  const iv = S.iv, limit = 720 / IV[iv], w = win();
+  try{
+    const [tickers, prem] = await Promise.all([getJSON("/fapi/v1/ticker/24hr"), getJSON("/fapi/v1/premiumIndex")]);
+    const fund = {}; prem.forEach(p => fund[p.symbol] = +p.lastFundingRate);
+    univ = tickers.filter(t => /USDT$/.test(t.symbol) && !t.symbol.includes("_") && +t.quoteVolume > 0).map(t => ({s:t.symbol, price:t.lastPrice, fund:fund[t.symbol], v24:+t.quoteVolume}));
+    const pinned = new Set(S.pins);
+    const cands = tickers.filter(t => /USDT$/.test(t.symbol) && !t.symbol.includes("_") && (+t.quoteVolume >= PRE || pinned.has(t.symbol))).map(t => t.symbol);
+    const volP = scanVol(tickers).catch(() => {});
+    const out = []; let i = 0;
+    async function worker(){
+      while(i < cands.length){
+        const s = cands[i++];
+        try{
+          const k = await getJSON(`/fapi/v1/klines?symbol=${s}&interval=${iv}&limit=${limit}`);
+          const cs = k.map(x => ({t:x[0], pct:(x[4]/x[1]-1)*100}));
+          const vol12 = k.reduce((a,x) => a + +x[7], 0);
+          const ww = cs.slice(-w);
+          let up = ww[0], dn = ww[0];
+          for(const c of ww){ if(c.pct > up.pct) up = c; if(c.pct < dn.pct) dn = c; }
+          const first = k[Math.max(0, k.length - w)];
+          out.push({s, vol12, price:k[k.length-1][4], up, dn, last:ww[ww.length-1], recent:cs.slice(-2),
+                    win:(k[k.length-1][4]/first[1]-1)*100, fund:fund[s]});
+        }catch(e){}
+      }
+    }
+    await Promise.all([...Array.from({length:8}, worker), volP]);
+    if(iv !== S.iv){ busy = false; return load(); }   // 抓取途中切換了週期
+    rows = out;
+    $("error").innerHTML = "";
+    checkAlerts();
+    armed = true;
+    render();
+    $("status").textContent = "更新於 " + new Date().toLocaleTimeString("zh-TW",{hour12:false});
+  }catch(e){
+    $("error").innerHTML = `<div class="err">無法連線到幣安 API（${e.message}）。請確認網路能連到 fapi.binance.com，且是用本機開啟這個 HTML 檔，而不是在聊天視窗內預覽。</div>`;
+    $("status").textContent = "更新失敗";
+  }
+  busy = false;
+  if(again){ again = false; load(); }
+}
+
+/* ---------- 提醒 ---------- */
+function beep(){
+  try{
+    ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value = 880; g.gain.value = .15;
+    o.start(); o.stop(ctx.currentTime + .25);
+  }catch(e){}
+}
+function checkAlerts(){
+  if(!S.notify) return;
+  const hid = new Set(S.hidden), pin = new Set(S.pins);
+  for(const r of rows){
+    if(hid.has(r.s) || (r.vol12 < S.minVol && !pin.has(r.s))) continue;
+    for(const c of r.recent){
+      if(Math.abs(c.pct) < S.thr) continue;
+      const key = S.iv + r.s + c.t;
+      if(alerted.has(key)) continue;
+      alerted.add(key);
+      if(armed) fire(r, c);
+    }
+  }
+}
+function fire(r, c){
+  const txt = `${r.s.replace("USDT","")} ${IVL[S.iv]}K ${sgn(c.pct)}`;
+  beep();
+  try{ if("Notification" in window && Notification.permission === "granted") new Notification("幣安合約異動", {body:txt}); }catch(e){}
+  log.unshift(`<li>${fmtTime(c.t)}　<a href="${link(r.s)}" target="_blank" rel="noopener">${r.s}</a>　<span class="${c.pct>0?'u':'d'}">${sgn(c.pct)}</span>（${IVL[S.iv]}K）</li>`);
+  $("alerts").innerHTML = log.slice(0,5).join("");
+}
+
+/* ---------- 持倉量 ---------- */
+async function fillOI(syms){
+  const need = [...new Set(syms)].filter(s => { const c = oi[S.iv+s]; return !c || Date.now() - c.at > 55000; });
+  if(!need.length) return;
+  const iv = S.iv, w = win();
+  await Promise.all(need.map(async s => {
+    try{
+      const d = await getJSON(`/futures/data/openInterestHist?symbol=${s}&period=${iv}&limit=${w+1}`);
+      oi[iv+s] = {at:Date.now(), pct:((+d[d.length-1].sumOpenInterestValue)/(+d[0].sumOpenInterestValue)-1)*100};
+    }catch(e){ oi[iv+s] = {at:Date.now(), pct:null}; }
+  }));
+  render();
+}
+function oiCell(r){
+  const o = oi[S.iv + r.s];
+  if(!o) return "…";
+  if(o.pct == null) return "–";
+  const tag = r.win > 0 ? (o.pct > 0 ? "新多進場" : "空單回補") : (o.pct > 0 ? "新空進場" : "多單平倉");
+  return `<span class="${o.pct>0?'u':'d'}">${sgn(o.pct)}</span><small>${tag}</small>`;
+}
+
+/* ---------- 30 日高低點 ---------- */
+const ext = {}, extPending = new Set();
+let univ = [], extPause = 0, extDone = 0;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const ek = s => s + "|" + S.days;
+function extSpec(d){ return d <= 60 ? {iv:"4h", limit:d*6} : {iv:"1d", limit:d}; }
+async function fillExt(syms){
+  const days = S.days, sp = extSpec(days);
+  const need = syms.filter(s => { const k = s + "|" + days, e = ext[k]; return (!e || Date.now() - e.at > (e.bad ? 120000 : 1800000)) && !extPending.has(k); });
+  if(!need.length) return;
+  need.forEach(s => extPending.add(s + "|" + days));
+  let i = 0;
+  async function wk(){
+    while(i < need.length){
+      const s = need[i++], key = s + "|" + days;
+      if(Date.now() < extPause) await sleep(extPause - Date.now());
+      try{
+        const k = await getJSON(`/fapi/v1/klines?symbol=${s}&interval=${sp.iv}&limit=${sp.limit}`);
+        ext[key] = {at:Date.now(), n:k.length, exp:sp.limit, hi:Math.max(...k.map(x => +x[2])), lo:Math.min(...k.map(x => +x[3]))};
+      }catch(e){
+        ext[key] = {at:Date.now(), bad:true};
+        if(/429|418/.test(e.message)) extPause = Date.now() + 60000;
+      }
+      extPending.delete(key);
+      if(++extDone % 40 === 0) renderExt();
+      await sleep(300);
+    }
+  }
+  await Promise.all(Array.from({length:3}, wk));
+  render();
+}
+function extOf(r){
+  const e = ext[ek(r.s)]; if(!e || e.bad) return null;
+  const p = +r.price, hi = Math.max(e.hi, p), lo = Math.min(e.lo, p);
+  return {n:e.n, exp:e.exp, hi, lo, dLo:(p/lo-1)*100, dHi:(1-p/hi)*100, pos:hi > lo ? (p-lo)/(hi-lo)*100 : 50, range:(hi/lo-1)*100};
+}
+function extTable(list, kind, emptyMsg){
+  if(!list.length) return `<div class="empty">${emptyMsg}</div>`;
+  const pin = new Set(S.pins), lo = kind === "lo";
+  const body = list.map((x, n) => {
+    const r = x.r, f = r.fund, hot = Math.abs(f) >= 0.0005;
+    return `<tr><td>${n+1}</td>
+      <td><a href="${link(r.s)}" target="_blank" rel="noopener">${r.s.replace("USDT","")}<span style="color:var(--mute);font-weight:400">/USDT</span></a>${x.e.n < x.e.exp * 0.97 ? '<small>上市未滿 ' + S.days + ' 日</small>' : ''}</td>
+      <td class="price">${fmtPrice(r.price)}</td>
+      <td class="dist">${lo ? "+" + x.e.dLo.toFixed(2) : "-" + x.e.dHi.toFixed(2)}%</td>
+      <td>${fmtPrice(lo ? x.e.lo : x.e.hi)}</td><td>${x.e.pos.toFixed(0)}%</td><td>${x.e.range.toFixed(1)}%</td>
+      <td class="${hot?'w':''}">${f==null?"–":(f*100).toFixed(4)+"%"}</td><td>${fmtVol(r.v24)}</td>
+      <td class="act"><button data-act="pin" data-s="${r.s}" class="${pin.has(r.s)?'on':''}" title="自選" aria-label="自選">${pin.has(r.s)?'★':'☆'}</button><button data-act="hide" data-s="${r.s}" title="隱藏" aria-label="隱藏">✕</button></td></tr>`;
+  }).join("");
+  return `<table><thead><tr><th></th><th>合約</th><th>現價</th><th>距離${lo?"低":"高"}點</th><th>${S.days}日${lo?"低":"高"}點</th><th>區間位置</th><th>${S.days}日振幅</th><th>資金費率</th><th>24h 成交額</th><th></th></tr></thead><tbody>${body}</tbody></table>`;
+}
+function renderExt(){
+  const hid = new Set(S.hidden);
+  const u = univ.filter(r => !hid.has(r.s));
+  fillExt(u.map(r => r.s));
+  const items = u.map(r => ({r, e:extOf(r)})).filter(x => x.e);
+  const msg = items.length < u.length && extPending.size ? `載入 ${S.days} 日資料中…（${items.length} / ${u.length}）` : "目前沒有符合條件的合約";
+  const lo = items.filter(x => x.e.pos < 50 && x.e.dLo <= S.lowPct).sort((a,b) => a.e.dLo - b.e.dLo);
+  const hi = items.filter(x => x.e.pos >= 50 && x.e.dHi <= S.highPct).sort((a,b) => a.e.dHi - b.e.dHi);
+  $("loT").textContent = `接近 ${S.days} 日低點（${lo.length} 個）`;
+  $("hiT").textContent = `接近 ${S.days} 日高點（${hi.length} 個）`;
+  $("lows").innerHTML = extTable(lo.slice(0,20), "lo", msg);
+  $("highs").innerHTML = extTable(hi.slice(0,20), "hi", msg);
+}
+
+/* ---------- 15 分 K 成交額 ---------- */
+let volHits = [], vArmed = false;
+const valerted = new Set();
+const VOL_EXCLUDE = new Set(["BTCUSDT", "ETHUSDT"]);   // 固定不顯示（市值資料取不到時的保底）
+let mcap = null;                                       // {BTC: 市值美元, ...}，取自 CoinGecko 前 100 名
+async function loadMcap(){
+  let cached = null;
+  try{ cached = JSON.parse(localStorage.getItem("bm_mcap") || "null"); }catch(e){}
+  if(cached && Date.now() - cached.at < 6 * 3600e3){ mcap = cached.d; return; }
+  try{
+    const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 8000);
+    const r = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1", {signal:ac.signal});
+    clearTimeout(tm);
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const m = {};
+    (await r.json()).forEach(c => { const k = String(c.symbol).toUpperCase(); if(!(k in m)) m[k] = c.market_cap; });
+    mcap = m;
+    try{ localStorage.setItem("bm_mcap", JSON.stringify({at:Date.now(), d:m})); }catch(e){}
+  }catch(e){ mcap = cached ? cached.d : null; }   // 失敗時用舊資料，沒有就只排除 BTC/ETH
+}
+const mcapReady = loadMcap();
+setInterval(() => { mcapReady.then(loadMcap); }, 6 * 3600e3 + 60000);
+const isBig = sym => !!(S.mcap > 0 && mcap && mcap[sym.replace(/USDT$/, "")] > S.mcap * 1e8);
+async function scanVol(tickers){
+  await mcapReady;
+  const thr = S.vthr * 1e4;
+  const syms = tickers.filter(t => /USDT$/.test(t.symbol) && !t.symbol.includes("_") && !VOL_EXCLUDE.has(t.symbol) && !isBig(t.symbol) && +t.quoteVolume >= thr).map(t => t.symbol);
+  const hits = []; let i = 0;
+  async function wk(){
+    while(i < syms.length){
+      const s = syms[i++];
+      try{
+        const k = await getJSON(`/fapi/v1/klines?symbol=${s}&interval=15m&limit=2`);
+        for(const c of k){
+          const qv = +c[7];
+          if(qv >= thr) hits.push({s, t:c[0], qv, pct:(c[4]/c[1]-1)*100, price:c[4], open:c[6] > Date.now()});
+        }
+      }catch(e){}
+    }
+  }
+  await Promise.all(Array.from({length:6}, wk));
+  volHits = hits;
+  if(S.vnotify){
+    const hid = new Set(S.hidden);
+    for(const h of hits){
+      if(hid.has(h.s)) continue;
+      const key = h.s + h.t;
+      if(valerted.has(key)) continue;
+      valerted.add(key);
+      if(vArmed) fireVol(h);
+    }
+  }
+  vArmed = true;
+}
+function fireVol(h){
+  const txt = `${h.s.replace("USDT","")} 15分K成交額 ${fmtVol(h.qv)} USDT`;
+  beep();
+  try{ if("Notification" in window && Notification.permission === "granted") new Notification("幣安合約成交量異動", {body:txt}); }catch(e){}
+  log.unshift(`<li>${fmtTime(h.t)}　<a href="${link(h.s)}" target="_blank" rel="noopener">${h.s}</a>　15分K成交額 <b>${fmtVol(h.qv)}</b>（${sgn(h.pct)}）</li>`);
+  $("alerts").innerHTML = log.slice(0,5).join("");
+}
+function renderVol(){
+  const hid = new Set(S.hidden), pin = new Set(S.pins), best = {};
+  volHits.filter(h => !hid.has(h.s)).forEach(h => { if(!best[h.s] || h.qv > best[h.s].qv) best[h.s] = h; });
+  const all = Object.values(best).sort((a,b) => b.qv - a.qv), list = all.slice(0,30);
+  $("vT").textContent = `15 分 K 成交額 ≥ ${S.vthr} 萬 USDT（${all.length} 個）` + (S.mcap > 0 ? (mcap ? `｜已排除市值 > ${S.mcap} 億美元` : "｜市值資料載入失敗，目前只排除 BTC、ETH") : "");
+  if(!list.length){ $("vols").innerHTML = `<div class="empty">目前沒有 15 分 K 成交額超過門檻的合約</div>`; return; }
+  const body = list.map((h, n) => `<tr><td>${n+1}</td>
+    <td><a href="${link(h.s)}" target="_blank" rel="noopener">${h.s.replace("USDT","")}<span style="color:var(--mute);font-weight:400">/USDT</span></a></td>
+    <td>${fmtTime(h.t)}</td><td class="chg w">${fmtVol(h.qv)}</td>
+    <td class="chg ${h.pct>0?'u':'d'}">${sgn(h.pct)}</td><td class="price">${fmtPrice(h.price)}</td><td>${h.open?"進行中":"已收盤"}</td>
+    <td class="act"><button data-act="pin" data-s="${h.s}" class="${pin.has(h.s)?'on':''}" title="自選" aria-label="自選">${pin.has(h.s)?'★':'☆'}</button><button data-act="hide" data-s="${h.s}" title="隱藏" aria-label="隱藏">✕</button></td></tr>`).join("");
+  $("vols").innerHTML = `<table><thead><tr><th></th><th>合約</th><th>K線時間</th><th>15分成交額</th><th>該根漲跌</th><th>價格</th><th>狀態</th><th></th></tr></thead><tbody>${body}</tbody></table>`;
+}
+
+/* ---------- 新上榜 ---------- */
+function track(key, list){
+  const cur = new Set(list.map(r => r.s)), now = Date.now();
+  if(!seen[key]){ seen[key] = {}; cur.forEach(s => seen[key][s] = 0); return; }
+  cur.forEach(s => { if(!(s in seen[key])) seen[key][s] = now; });
+  Object.keys(seen[key]).forEach(s => { if(!cur.has(s)) delete seen[key][s]; });
+}
+const isNew = (key, s) => { const t = seen[key] && seen[key][s]; return t && Date.now() - t < 600000; };
+
+/* ---------- 畫面 ---------- */
+function table(list, sel, cls, key){
+  if(!list.length) return `<div class="empty">目前沒有符合條件的合約</div>`;
+  const pin = new Set(S.pins);
+  const body = list.map((r, n) => {
+    const c = sel(r), f = r.fund, hot = Math.abs(f) >= 0.0005;
+    const color = cls || (c.pct > 0 ? "u" : "d");
+    return `<tr><td>${n+1}</td>
+      <td><a href="${link(r.s)}" target="_blank" rel="noopener">${r.s.replace("USDT","")}<span style="color:var(--mute);font-weight:400">/USDT</span></a>${isNew(key, r.s) ? '<span class="new">新</span>' : ''}</td>
+      <td class="chg ${color}">${sgn(c.pct)}</td><td>${fmtTime(c.t)}</td><td class="price">${fmtPrice(r.price)}</td>
+      <td class="${hot?'w':''}" title="資金費率（每期）">${f==null?"–":(f*100).toFixed(4)+"%"}</td>
+      <td>${oiCell(r)}</td><td>${fmtVol(r.vol12)}</td>
+      <td class="act"><button data-act="pin" data-s="${r.s}" class="${pin.has(r.s)?'on':''}" title="自選" aria-label="自選">${pin.has(r.s)?'★':'☆'}</button><button data-act="hide" data-s="${r.s}" title="隱藏" aria-label="隱藏">✕</button></td></tr>`;
+  }).join("");
+  return `<table><thead><tr><th></th><th>合約</th><th>${IVL[S.iv]}漲跌</th><th>時間</th><th>現價</th><th>資金費率</th><th>OI 變化</th><th>12h 成交額</th><th></th></tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function render(){
+  const hid = new Set(S.hidden), pin = new Set(S.pins);
+  const f = rows.filter(r => !hid.has(r.s) && r.vol12 >= S.minVol);
+  const upSel = S.mode === "max" ? r => r.up : r => r.last;
+  const dnSel = S.mode === "max" ? r => r.dn : r => r.last;
+  const g = f.filter(r => upSel(r).pct > 0).sort((a,b) => upSel(b).pct - upSel(a).pct).slice(0,10);
+  const l = f.filter(r => dnSel(r).pct < 0).sort((a,b) => dnSel(a).pct - dnSel(b).pct).slice(0,10);
+  const p = rows.filter(r => pin.has(r.s)).sort((a,b) => Math.abs(b.last.pct) - Math.abs(a.last.pct));
+  track("g", g); track("l", l);
+
+  $("gT").textContent = `漲幅榜（${IVL[S.iv]}K）`;
+  $("lT").textContent = `跌幅榜（${IVL[S.iv]}K）`;
+  $("gainers").innerHTML = table(g, upSel, "u", "g");
+  $("losers").innerHTML = table(l, dnSel, "d", "l");
+  $("pinPanel").hidden = !S.pins.length;
+  $("pins").innerHTML = S.pins.length ? table(p, r => r.last, null, "p") : "";
+
+  $("hidBtn").textContent = `已隱藏 ${S.hidden.length} 個`;
+  $("hiddenBox").innerHTML = S.hidden.map(s => `<button data-act="restore" data-s="${s}" title="點一下恢復顯示">${s.replace("USDT","")} ↺</button>`).join("");
+  if(!S.hidden.length) $("hiddenBox").hidden = true;
+
+  renderExt();
+  renderVol();
+  fillOI([...g, ...l, ...p].map(r => r.s));
+}
+
+/* ---------- 互動 ---------- */
+function group(id, key, conv, onChange){
+  const el = $(id);
+  const sync = () => el.querySelectorAll("button").forEach(b => b.classList.toggle("on", conv(b.dataset.v) === S[key]));
+  sync();
+  el.addEventListener("click", e => {
+    const b = e.target.closest("button"); if(!b) return;
+    S[key] = conv(b.dataset.v); save(); sync(); seen = {}; onChange();
+  });
+}
+group("vol", "minVol", Number, render);
+group("mode", "mode", String, render);
+group("iv", "iv", String, () => { rows = []; render(); load(); });
+
+$("thr").value = S.thr;
+$("thr").addEventListener("change", e => { S.thr = Math.max(0.5, +e.target.value || 10); e.target.value = S.thr; save(); });
+$("loPct").value = S.lowPct; $("hiPct").value = S.highPct;
+$("loPct").addEventListener("change", e => { S.lowPct = Math.max(0.1, +e.target.value || 10); e.target.value = S.lowPct; save(); render(); });
+$("hiPct").addEventListener("change", e => { S.highPct = Math.max(0.1, +e.target.value || 10); e.target.value = S.highPct; save(); render(); });
+$("days").value = S.days;
+$("days").addEventListener("change", e => { S.days = Math.min(365, Math.max(1, Math.round(+e.target.value || 30))); e.target.value = S.days; save(); render(); });
+$("vthr").value = S.vthr;
+$("vthr").addEventListener("change", e => { S.vthr = Math.max(10, +e.target.value || 1000); e.target.value = S.vthr; save(); vArmed = false; valerted.clear(); load(); });
+$("mcap").value = S.mcap;
+$("mcap").addEventListener("change", e => { S.mcap = Math.max(0, +e.target.value || 0); e.target.value = S.mcap; save(); vArmed = false; valerted.clear(); load(); });
+$("vnotify").checked = S.vnotify;
+$("vnotify").addEventListener("change", e => {
+  S.vnotify = e.target.checked; save();
+  if(S.vnotify){
+    try{ ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); ctx.resume(); }catch(_){}
+    if("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+    vArmed = false; valerted.clear(); load();
+  }
+});
+const isDark = () => S.theme === "dark" || (S.theme === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
+function applyTheme(){
+  if(S.theme === "auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.dataset.theme = S.theme;
+  $("theme").textContent = isDark() ? "☾ 夜間模式" : "☀ 日間模式";
+}
+$("theme").addEventListener("click", () => { S.theme = isDark() ? "light" : "dark"; save(); applyTheme(); });
+applyTheme();
+$("notify").checked = S.notify;
+$("notify").addEventListener("change", e => {
+  S.notify = e.target.checked; save();
+  if(S.notify){
+    try{ ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); ctx.resume(); }catch(_){}
+    if("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+    armed = false; alerted.clear(); load();   // 重新建立基準，避免一開啟就大量彈出
+  }
+});
+$("hidBtn").addEventListener("click", () => { if(S.hidden.length) $("hiddenBox").hidden = !$("hiddenBox").hidden; });
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("button[data-act]"); if(!b) return;
+  const s = b.dataset.s, a = b.dataset.act;
+  if(a === "pin"){
+    S.pins = S.pins.includes(s) ? S.pins.filter(x => x !== s) : [...S.pins, s];
+  }else if(a === "hide"){
+    S.hidden = [...new Set([...S.hidden, s])]; S.pins = S.pins.filter(x => x !== s);
+  }else if(a === "restore"){
+    S.hidden = S.hidden.filter(x => x !== s);
+  }
+  save(); render();
+});
+
+load();
+setInterval(load, 30000);
+</script>
+</body>
+</html>
