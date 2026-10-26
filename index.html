@@ -158,7 +158,7 @@ td small{display:block;color:var(--mute);font-size:11px;line-height:1.2}
       <div class="scroll tall" id="z4B"></div>
     </section>
     <section class="panel zone" id="z5">
-      <h2 id="z5T">自選追蹤：MACD／成交量／RSI 背離</h2>
+      <h2 id="z5T">自選追蹤：以 MACD 為主的背離偵測</h2>
       <div class="zc">
         <input type="text" id="tadd" size="18" placeholder="輸入幣種，如 DOGE、PEPE">
         <button class="tbtn" id="tbtn">加入</button>
@@ -184,9 +184,7 @@ td small{display:block;color:var(--mute);font-size:11px;line-height:1.2}
   </div>
 
   <p class="note">
-    <b>資金費率</b>：正值代表多頭付費給空頭，數值偏高（≥0.05% 以橘色標示）常見於多頭擁擠，追多風險較高。<br>
-    <b>新</b>：10 分鐘內剛進入榜單的合約。<br>
-    <b>背離總覽與提醒</b>：修正過後，背離掃描每 60 秒會自動強制檢查並刷新，不再被長週期 K 線卡住。
+    <b>說明</b>：背離以 MACD 背離為主要必要條件，僅在 MACD 背離成立時才會同時檢視成交量與 RSI 背離。所有背離資訊每 2 分鐘會自動強制抓取更新一次。
   </p>
 </div>
 
@@ -271,7 +269,7 @@ async function load(){
     scanTrack().catch(() => {});
     $("status").textContent = "更新於 " + new Date().toLocaleTimeString("zh-TW",{hour12:false});
   }catch(e){
-    $("error").innerHTML = `<div class="err">無法連線到幣安 API（${e.message}）。請確認網路能連到 fapi.binance.com，且是用本機開啟這個 HTML 檔，而不是在聊天視窗內預覽。</div>`;
+    $("error").innerHTML = `<div class="err">無法連線到幣安 API（${e.message}）。請確認網路連線正常。</div>`;
     $("status").textContent = "更新失敗";
   }
   busy = false;
@@ -359,7 +357,7 @@ function renderExt(){
   const capOn = S.capMin > 0 || S.capMax > 0;
   const inCap = sym => { const c = capOf(sym); return c != null && (S.capMin <= 0 || c >= S.capMin * 1e4) && (S.capMax <= 0 || c <= S.capMax * 1e4); };
   if(capOn && (!mcap || mcapInfo.state === "loading")){
-    const m = mcapInfo.state === "fail" ? "市值資料載入失敗（CoinGecko 連不上或被限流），請稍後重新整理" : `市值資料載入中…${mcapInfo.page ? "（第 " + mcapInfo.page + " 頁）" : ""}`;
+    const m = mcapInfo.state === "fail" ? "市值資料載入失敗" : `市值資料載入中…${mcapInfo.page ? "（第 " + mcapInfo.page + " 頁）" : ""}`;
     $("loT").textContent = `接近 ${S.days} 日低點`; $("hiT").textContent = `接近 ${S.days} 日高點`;
     $("lows").innerHTML = $("highs").innerHTML = `<div class="empty">${m}</div>`;
     return;
@@ -484,13 +482,13 @@ function renderVol(){
   const hid = new Set(S.hidden), best = {};
   volHits.filter(h => !hid.has(h.s)).forEach(h => { if(!best[h.s] || h.qv > best[h.s].qv) best[h.s] = h; });
   const list = Object.values(best).sort((a,b) => b.qv - a.qv);
-  $("z2T").textContent = `${VTF[S.vtf]} K 成交額 ≥ ${S.vthr} 萬（${list.length} 個）` + (S.mcap > 0 && !mcap ? "｜市值資料未載入，暫未排除大市值" : "");
+  $("z2T").textContent = `${VTF[S.vtf]} K 成交額 ≥ ${S.vthr} 萬（${list.length} 個）` + (S.mcap > 0 && !mcap ? "｜市值資料未載入" : "");
   $("z2B").innerHTML = zoneTable(list, ["合約","K線","成交額","漲跌","價格","狀態"],
     h => `${nameCell(h.s)}<td>${fmtTime(h.t)}</td><td class="chg w">${fmtVol(h.qv)}</td><td class="chg ${h.pct>0?'u':'d'}">${sgn(h.pct)}</td><td class="price">${fmtPrice(h.price)}</td><td>${h.open?"進行中":"已收盤"}</td>`,
     vArmed ? "目前沒有符合條件的合約" : "掃描中…");
 }
 
-/* ---------- 背離偵測（MACD／成交量／RSI） ---------- */
+/* ---------- 背離偵測（以 MACD背離為主要前提） ---------- */
 const TF = {"5m":{ms:300000, l:"5 分"}, "15m":{ms:900000, l:"15 分"}, "4h":{ms:14400000, l:"4 小時"}, "1d":{ms:86400000, l:"1 日"}};
 const divCache = {}; 
 const dalerted = new Set();
@@ -527,15 +525,22 @@ function detectDiv(k){
     const a = top ? hi : lo, pv = pivots(a, 4, 2, top);
     if(pv.length < 2) continue;
     const p2 = pv[pv.length-1];
-    if(p2 < n - 1 - 24) continue; // 【修改】從 12 擴大至 24 根，保留更多最新發生的背離
+    // 只保留近期說明的轉折 (24根K線內)
+    if(p2 < n - 1 - 24) continue;
     let p1 = -1;
     for(let i = pv.length - 2; i >= 0; i--){ const d = p2 - pv[i]; if(d >= 5 && d <= 60){ p1 = pv[i]; break; } }
     if(p1 < 0) continue;
     if(top ? !(a[p2] > a[p1]) : !(a[p2] < a[p1])) continue;
+
+    // 必須成立 MACD 背離，否則直接掠過
     const macd = top ? (dif[p1] > 0 && dif[p2] < dif[p1]*0.9) : (dif[p1] < 0 && dif[p2] > dif[p1]*0.9);
+    if(!macd) continue;
+
+    // MACD 背離成立後，才檢視成交量與 RSI
     const vol = v3(p2) < v3(p1)*0.7;
     const rsiD = top ? (rsi[p1] > 55 && rsi[p2] < rsi[p1] - 2) : (rsi[p1] < 45 && rsi[p2] > rsi[p1] + 2);
-    if(macd || vol || rsiD) out.push({top, t:k[p2][0], macd, vol, rsi:rsiD});
+    
+    out.push({top, t:k[p2][0], macd: true, vol, rsi:rsiD});
   }
   return out;
 }
@@ -552,15 +557,17 @@ async function scanTF(tf){
       if(Date.now() < extPause) await sleep(extPause - Date.now());
       try{
         const k = await getJSON(`/fapi/v1/klines?symbol=${s}&interval=${tf}&limit=200`);
-        detectDiv(k.filter(x => x[6] < Date.now())).forEach(d => hits.push({...d, s, tf, price:k[k.length-1][4]}));
+        // 【修復延遲關鍵】只保留「已經收盤」的 K 線進行分析，避免未閉合 K 線卡住 Pivot確認期
+        const closedK = k.filter(x => x[6] <= Date.now());
+        detectDiv(closedK).forEach(d => hits.push({...d, s, tf, price:k[k.length-1][4]}));
       }catch(e){ if(/429|418/.test(e.message)) extPause = Date.now() + 60000; }
       await sleep(150);
     }
   }
   await Promise.all(Array.from({length:4}, wk));
   c.busy = false;
-  // 【關鍵修正】強制每 60 秒刷新一次背離資料，不要再讓 4h、1d 的快取冷卻幾小時！
-  c.next = Date.now() + 60000; 
+  // 每 2 分鐘 (120 秒) 強制重新載入快取
+  c.next = Date.now() + 120000; 
   c.hits = hits;
 
   if(tf === S.dtf && S.dnotify) for(const h of hits){
@@ -586,14 +593,14 @@ function renderDiv(){
   $("z3T").textContent = `MACD＋成交量 同時背離（${TF[S.dtf].l}K，${l3.length} 個）`;
   $("z3B").innerHTML = zoneTable(l3, ["合約","方向","RSI","K線時間","現價"],
     h => `${nameCell(h.s)}<td class="chg ${h.top?'d':'u'}">${h.top?"頂背離":"底背離"}</td>${mark(h.rsi, h.top)}<td>${fmtT(h.t, h.tf)}</td><td class="price">${fmtPrice(h.price)}</td>`,
-    c3 && c3.armed ? "目前沒有同時背離的合約" : "掃描中…（首次約需十幾秒）");
+    c3 && c3.armed ? "目前沒有同時背離的合約" : "掃描中…");
   const cnt = h => (h.macd?1:0) + (h.vol?1:0) + (h.rsi?1:0);
   const v24 = {}; univ.forEach(r => v24[r.s] = r.v24);
-  const l4 = (c4 ? c4.hits : []).filter(h => !hid.has(h.s)).sort((a,b) => b.t - a.t || cnt(b) - cnt(a) || a.s.localeCompare(b.s));
-  $("z4T").textContent = `背離總覽：MACD／成交量／RSI（${TF[S.otf].l}K，${l4.length} 個）`;
+  const l4 = (c4 ? c4.hits : []).filter(h => h.macd && !hid.has(h.s)).sort((a,b) => b.t - a.t || cnt(b) - cnt(a) || a.s.localeCompare(b.s));
+  $("z4T").textContent = `背離總覽：以 MACD 為主要背離（${TF[S.otf].l}K，${l4.length} 個）`;
   $("z4B").innerHTML = zoneTable(l4, ["合約","方向","MACD","成交量","RSI","K線時間","24h 成交額"],
     h => `${nameCell(h.s)}<td class="chg ${h.top?'d':'u'}">${h.top?"頂背離":"底背離"}</td>${mark(h.macd, h.top)}${mark(h.vol, h.top)}${mark(h.rsi, h.top)}<td>${fmtT(h.t, h.tf)}</td><td>${fmtVol(v24[h.s] || 0)}</td>`,
-    c4 && c4.armed ? "目前沒有背離的合約" : "掃描中…（首次約需十幾秒）");
+    c4 && c4.armed ? "目前沒有符合 MACD 背離的合約" : "掃描中…");
 }
 
 /* ---------- 自選追蹤 ---------- */
@@ -609,15 +616,16 @@ async function scanTrack(){
     await Promise.all(S.track.map(async b => {
       try{
         const k = await getJSON(`/fapi/v1/klines?symbol=${b}USDT&interval=${tf}&limit=200`);
-        res[b] = {price:k[k.length-1][4], divs:detectDiv(k.filter(x => x[6] < Date.now()))};
+        const closedK = k.filter(x => x[6] <= Date.now());
+        res[b] = {price:k[k.length-1][4], divs:detectDiv(closedK)};
       }catch(e){ res[b] = {err:true}; }
     }));
     c.busy = false; c.res = res; 
-    // 【修改】追蹤清單也調整為每 60 秒刷新一次
-    c.next = Date.now() + 60000; 
+    c.next = Date.now() + 120000; 
     if(S.tnotify) for(const b of S.track){
       const r = res[b]; if(!r || r.err) continue;
       for(const d of r.divs){
+        if(!d.macd) continue;
         const key = "t" + tf + b + d.top + d.t + kindsOf(d);
         if(talerted.has(key)) continue;
         talerted.add(key);
@@ -640,7 +648,7 @@ function renderTrack(){
     const c = trk[tf], r = c && c.res[b], nm = `<a href="${link(b+"USDT")}" target="_blank" rel="noopener">${b}</a>`;
     if(!r) rows.push(`<tr><td>${nm}</td><td>${TF[tf].l}</td><td colspan="6" style="color:var(--mute);text-align:left">掃描中…</td></tr>`);
     else if(r.err) rows.push(`<tr><td>${b}</td><td>${TF[tf].l}</td><td colspan="6" style="color:var(--down);text-align:left">找不到 ${b}USDT 合約</td></tr>`);
-    else if(!r.divs.length) rows.push(`<tr><td>${nm}</td><td>${TF[tf].l}</td><td style="color:var(--mute)">無背離</td><td>–</td><td>–</td><td>–</td><td>–</td><td class="price">${fmtPrice(r.price)}</td></tr>`);
+    else if(!r.divs.length) rows.push(`<tr><td>${nm}</td><td>${TF[tf].l}</td><td style="color:var(--mute)">無 MACD 背離</td><td>–</td><td>–</td><td>–</td><td>–</td><td class="price">${fmtPrice(r.price)}</td></tr>`);
     else for(const d of r.divs) rows.push(`<tr><td>${nm}</td><td>${TF[tf].l}</td><td class="chg ${d.top?'d':'u'}">${d.top?"頂背離":"底背離"}</td>${mark(d.macd, d.top)}${mark(d.vol, d.top)}${mark(d.rsi, d.top)}<td>${fmtT(d.t, tf)}</td><td class="price">${fmtPrice(r.price)}</td></tr>`);
   }
   $("z5B").innerHTML = rows.length ? `<table><thead><tr><th>合約</th><th>週期</th><th>方向</th><th>MACD</th><th>成交量</th><th>RSI</th><th>K線時間</th><th>現價</th></tr></thead><tbody>${rows.join("")}</tbody></table>` : "";
@@ -780,12 +788,10 @@ $("dnotify").addEventListener("change", e => {
   }
 });
 group("dtf", "dtf", String, () => {
-  // 切換背離提醒週期時，重置該週期的快取以利即時更新
   if(divCache[S.dtf]) divCache[S.dtf].next = 0;
   renderDiv(); ensureDiv(); 
 });
 group("otf", "otf", String, () => { 
-  // 切換背離總覽週期時，重置該週期的快取以利即時更新
   if(divCache[S.otf]) divCache[S.otf].next = 0;
   renderDiv(); ensureDiv(); 
 });
@@ -837,3 +843,6 @@ setInterval(load, 30000);
 </script>
 </body>
 </html>
+```eof
+
+你可以直接下載或複製該檔案覆蓋專案內容。在測試背離訊號時，若有任何即時性問題，建議在開發者工具中暫時勾選「Disable cache」進行確認。
